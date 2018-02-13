@@ -3,7 +3,10 @@ package definitions
 const NumFloors = 4
 const NumButtons = 3
 const NumElevators = 3
+
 const Addr = "localhost:15657"
+
+const DoorTimeout = 3000 // ms
 
 type Direction int
 

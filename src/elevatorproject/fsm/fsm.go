@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"time"
+	"os"
+	"os/signal"
 
-	"elevatorproject/definitions"
+	def "elevatorproject/definitions"
 	"elevatorproject/driver/elevio"
 	"elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
@@ -12,7 +14,7 @@ import (
 
 var Elevator struct {
 	Floor     int
-	Dir       definitions.Direction
+	Dir       def.Direction
 	Behaviour ElevatorBehaviour
 	ID        string
 }
@@ -26,27 +28,26 @@ const (
 	Moving                     = 2
 )
 
-var doorTimerResetCh chan bool
+var doorTimerResetCh chan bool = make(chan bool)
 
 func main() {
 
 	// Initializations
-	elevio.Init(definitions.Addr, definitions.NumFloors)
+	elevio.Init(def.Addr, def.NumFloors)
 	initFsm()
 
 	// Channels
-	drvButtons := make(chan definitions.ButtonEvent)
+	drvButtons := make(chan def.ButtonEvent)
 	drvFloors := make(chan int)
 	drvObstr := make(chan bool)
 	drvStop := make(chan bool)
-	doorTimerResetCh = make(chan bool)
 
 	go elevio.PollButtons(drvButtons)
 	go elevio.PollFloorSensor(drvFloors)
 	go elevio.PollObstructionSwitch(drvObstr)
 	go elevio.PollStopButton(drvStop)
-	go doorTimer(doorTimerResetCh)
 
+	// Listen to channels
 	for {
 		select {
 		case a := <-drvButtons:
@@ -60,15 +61,15 @@ func main() {
 		case a := <-drvObstr:
 			fmt.Printf("%+v\n", a)
 			if a {
-				setMotorDirection(definitions.Stop)
+				elevio.SetMotorDirection(def.Stop)
 			} else {
-				setMotorDirection(definitions.Up)
+				elevio.SetMotorDirection(def.Up)
 			}
 
 		case a := <-drvStop:
 			fmt.Printf("%+v\n", a)
-			for f := 0; f < definitions.NumFloors; f++ {
-				for b := definitions.ButtonType(0); b < 3; b++ {
+			for f := 0; f < def.NumFloors; f++ {
+				for b := def.ButtonType(0); b < 3; b++ {
 					elevio.SetButtonLamp(b, f, false)
 				}
 			}
@@ -78,29 +79,25 @@ func main() {
 
 func initFsm() {
 	Elevator.Floor = -1
-	Elevator.Dir = definitions.Stop
-	Elevator.Behaviour = Moving
+	Elevator.Dir = def.Stop
+	Elevator.Behaviour = Idle
 	Elevator.ID = "A"
-	setMotorDirection(definitions.Up)
+
+	go safeShutdown()
+	go doorTimer(doorTimerResetCh)
 }
 
-func setMotorDirection(dir definitions.Direction) {
-	elevio.SetMotorDirection(dir)
-	Elevator.Behaviour = Moving
-	Elevator.Dir = dir
-}
 
 func onFloorArrival(newFloor int) {
 	Elevator.Floor = newFloor
 	elevio.SetFloorIndicator(newFloor)
-
 	if scheduler.ShouldStop(Elevator.Floor, Elevator.Dir) {
-		elevio.SetMotorDirection(definitions.Stop)
+		elevio.SetMotorDirection(def.Stop)
 		elevio.SetDoorOpenLamp(true)
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
 		doorTimerResetCh <- true
-		setAllLights()
 		Elevator.Behaviour = DoorOpen
+		setAllLights()
 	}
 }
 
@@ -108,30 +105,41 @@ func onDoorTimeout() {
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetMotorDirection(Elevator.Dir)
-	if Elevator.Dir == definitions.Stop {
+	if Elevator.Dir == def.Stop {
 		Elevator.Behaviour = Idle
 	} else {
 		Elevator.Behaviour = Moving
+		elevio.SetMotorDirection(Elevator.Dir)
+	}
+}
+
+func setAllLights() {
+	for floor := 0; floor < def.NumFloors; floor++ {
+		for btn := def.ButtonType(0); btn < def.NumButtons; btn++ {
+			elevio.SetButtonLamp(btn, floor, ordermanager.GetOrder(floor, btn))
+		}
 	}
 }
 
 func doorTimer(resetCh chan bool) {
-	timer := time.NewTimer(3 * time.Second)
+	timer := time.NewTimer(def.DoorTimeout * time.Millisecond)
 	timer.Stop()
 	for {
 		select {
 		case <-resetCh:
-			timer.Reset(3 * time.Second)
+			timer.Reset(def.DoorTimeout * time.Millisecond)
 		case <-timer.C:
 			onDoorTimeout()
 		}
 	}
 }
 
-func setAllLights() {
-	for floor := 0; floor < definitions.NumFloors; floor++ {
-		for btn := definitions.ButtonType(0); btn < definitions.NumButtons; btn++ {
-			elevio.SetButtonLamp(btn, floor, ordermanager.GetOrder(floor, btn))
-		}
-	}
+// safeShutdown shutdowns the program in a safe way when terminataed by user (ctrl+c)
+func safeShutdown() {
+	var c = make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	elevio.SetMotorDirection(def.Stop)
+	fmt.Println("User terminated the program")
+	os.Exit(1)
 }

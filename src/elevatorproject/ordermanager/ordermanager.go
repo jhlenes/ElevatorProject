@@ -1,10 +1,10 @@
 package ordermanager
 
 import (
-	"elevatorproject/definitions"
+	def "elevatorproject/definitions"
 )
 
-func GetOrder(floor int, button definitions.ButtonType) bool {
+func GetOrder(floor int, button def.ButtonType) bool {
 	return false
 }
 

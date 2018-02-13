@@ -1,36 +1,32 @@
 package scheduler
 
 import (
-	"elevatorproject/definitions"
+	def "elevatorproject/definitions"
 	"elevatorproject/ordermanager"
 )
 
-func ShouldStop(floor int, dir definitions.Direction) bool {
+func ShouldStop(floor int, dir def.Direction) bool {
 	return true
 }
 
-func ClearOrders(floor int, dir definitions.Direction) {
+func ClearOrders(floor int, dir def.Direction) {
 	return
 }
 
-func ChooseDirection(floor int, dir definitions.Direction) definitions.Direction {
+func ChooseDirection(floor int, dir def.Direction) def.Direction {
 	switch dir {
-	case definitions.Up:
+	case def.Up:
 		if ordermanager.OrdersAbove(floor) {
-			return definitions.Up
+			return def.Up
 		} else if ordermanager.OrdersBelow(floor) {
-			return definitions.Down
-		} else {
-			return definitions.Stop
+			return def.Down
 		}
-	case definitions.Down, definitions.Stop:
+	case def.Down, def.Stop:
 		if ordermanager.OrdersBelow(floor) {
-			return definitions.Down
+			return def.Down
 		} else if ordermanager.OrdersAbove(floor) {
-			return definitions.Up
-		} else {
-			return definitions.Stop
+			return def.Up
 		}
 	}
-	return definitions.Stop // should never happen
+	return def.Stop
 }

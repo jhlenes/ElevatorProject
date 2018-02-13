@@ -4,7 +4,7 @@ import "time"
 import "sync"
 import "net"
 import "fmt"
-import "elevatorproject/definitions"
+import def "elevatorproject/definitions"
 
 const _pollRate = 20 * time.Millisecond
 
@@ -25,16 +25,32 @@ func Init(addr string, numFloors int) {
 	if err != nil {
 		panic(err.Error())
 	}
+
+	// Reset elevator states
+	SetDoorOpenLamp(false)
+	SetStopLamp(false)
+	if f := getFloor(); f == -1 {
+		SetMotorDirection(def.Up)
+	} else {
+		SetMotorDirection(def.Up)
+		SetFloorIndicator(f)
+	}
+	for f := 0; f < def.NumFloors; f++ {
+		for b := def.ButtonType(0); b < def.NumButtons; b++ {
+			SetButtonLamp(b, f, false)
+		}
+	}
+
 	_initialized = true
 }
 
-func SetMotorDirection(dir definitions.Direction) {
+func SetMotorDirection(dir def.Direction) {
 	_mtx.Lock()
 	defer _mtx.Unlock()
 	_conn.Write([]byte{1, byte(dir), 0, 0})
 }
 
-func SetButtonLamp(button definitions.ButtonType, floor int, value bool) {
+func SetButtonLamp(button def.ButtonType, floor int, value bool) {
 	_mtx.Lock()
 	defer _mtx.Unlock()
 	_conn.Write([]byte{2, byte(button), byte(floor), toByte(value)})
@@ -58,15 +74,15 @@ func SetStopLamp(value bool) {
 	_conn.Write([]byte{5, toByte(value), 0, 0})
 }
 
-func PollButtons(receiver chan<- definitions.ButtonEvent) {
+func PollButtons(receiver chan<- def.ButtonEvent) {
 	prev := make([][3]bool, _numFloors)
 	for {
 		time.Sleep(_pollRate)
 		for f := 0; f < _numFloors; f++ {
-			for b := definitions.ButtonType(0); b < 3; b++ {
+			for b := def.ButtonType(0); b < 3; b++ {
 				v := getButton(b, f)
 				if v != prev[f][b] && v != false {
-					receiver <- definitions.ButtonEvent{f, definitions.ButtonType(b)}
+					receiver <- def.ButtonEvent{f, def.ButtonType(b)}
 				}
 				prev[f][b] = v
 			}
@@ -110,7 +126,7 @@ func PollObstructionSwitch(receiver chan<- bool) {
 	}
 }
 
-func getButton(button definitions.ButtonType, floor int) bool {
+func getButton(button def.ButtonType, floor int) bool {
 	_mtx.Lock()
 	defer _mtx.Unlock()
 	_conn.Write([]byte{6, byte(button), byte(floor), 0})
