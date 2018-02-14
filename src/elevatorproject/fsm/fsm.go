@@ -2,14 +2,23 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"os"
 	"os/signal"
+	"time"
 
 	def "elevatorproject/definitions"
 	"elevatorproject/driver/elevio"
 	"elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
+)
+
+type ElevatorBehaviour int
+
+// Elevator behaviours
+const (
+	Idle ElevatorBehaviour = iota
+	DoorOpen
+	Moving
 )
 
 var Elevator struct {
@@ -18,15 +27,6 @@ var Elevator struct {
 	Behaviour ElevatorBehaviour
 	ID        string
 }
-
-type ElevatorBehaviour int
-
-// Elevator behaviours
-const (
-	Idle     ElevatorBehaviour = 0
-	DoorOpen                   = 1
-	Moving                     = 2
-)
 
 var doorTimerResetCh chan bool = make(chan bool)
 
@@ -50,9 +50,9 @@ func main() {
 	// Listen to channels
 	for {
 		select {
-		case a := <-drvButtons:
-			fmt.Printf("%+v\n", a)
-			elevio.SetButtonLamp(a.Button, a.Floor, true)
+		case button := <-drvButtons:
+			fmt.Printf("%+v\n", button)
+			onNewRequest(button)
 
 		case floor := <-drvFloors:
 			fmt.Printf("%+v\n", floor)
@@ -87,8 +87,50 @@ func initFsm() {
 	go doorTimer(doorTimerResetCh)
 }
 
+func onNewRequest(button def.ButtonEvent) {
+	switch Elevator.Behaviour {
+	case DoorOpen:
+		if Elevator.Floor == button.Floor {
+			doorTimerResetCh <- true
+		} else {
+			ordermanager.AddOrder(button.Floor, button.Button)
+		}
+	case Moving:
+		ordermanager.AddOrder(button.Floor, button.Button)
+	case Idle:
+		if Elevator.Floor == button.Floor {
+			elevio.SetDoorOpenLamp(true)
+			Elevator.Behaviour = DoorOpen
+			doorTimerResetCh <- true
+		} else {
+			ordermanager.AddOrder(button.Floor, button.Button)
+			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
+			elevio.SetMotorDirection(Elevator.Dir)
+			Elevator.Behaviour = Moving
+		}
+	}
+	setAllLights()
+}
+
+func checkDirection(newFloor int) {
+	oldFloor := Elevator.Floor
+	if oldFloor == -1 { // elevator was initialized between floors
+		Elevator.Dir = def.Stop
+		elevio.SetMotorDirection(def.Stop)
+	} else {
+		if newFloor-oldFloor > 0 {
+			Elevator.Dir = def.Up
+		} else if newFloor-oldFloor < 0 {
+			Elevator.Dir = def.Down
+		} else {
+			Elevator.Dir = def.Stop
+		}
+	}
+}
 
 func onFloorArrival(newFloor int) {
+	checkDirection(newFloor)
+
 	Elevator.Floor = newFloor
 	elevio.SetFloorIndicator(newFloor)
 	if scheduler.ShouldStop(Elevator.Floor, Elevator.Dir) {
@@ -116,7 +158,7 @@ func onDoorTimeout() {
 func setAllLights() {
 	for floor := 0; floor < def.NumFloors; floor++ {
 		for btn := def.ButtonType(0); btn < def.NumButtons; btn++ {
-			elevio.SetButtonLamp(btn, floor, ordermanager.GetOrder(floor, btn))
+			elevio.SetButtonLamp(btn, floor, ordermanager.HasOrder(floor, btn))
 		}
 	}
 }
