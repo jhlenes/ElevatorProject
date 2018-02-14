@@ -6,25 +6,47 @@ import (
 )
 
 func ShouldStop(floor int, dir def.Direction) bool {
-	return true
+	switch dir {
+	case def.Down:
+		return ordermanager.HasOrder(floor, def.BT_Cab) ||
+			ordermanager.HasOrder(floor, def.BT_HallDown) ||
+			!ordermanager.HasOrderBelow(floor)
+	case def.Up:
+		return ordermanager.HasOrder(floor, def.BT_Cab) ||
+			ordermanager.HasOrder(floor, def.BT_HallUp) ||
+			!ordermanager.HasOrderAbove(floor)
+	}
+	return false
 }
 
 func ClearOrders(floor int, dir def.Direction) {
-	return
+	ordermanager.RemoveOrder(floor, def.BT_Cab)
+	switch dir {
+	case def.Down:
+		ordermanager.RemoveOrder(floor, def.BT_HallDown)
+		if !ordermanager.HasOrderBelow(floor) {
+			ordermanager.RemoveOrder(floor, def.BT_HallUp)
+		}
+	case def.Up:
+		ordermanager.RemoveOrder(floor, def.BT_HallUp)
+		if !ordermanager.HasOrderAbove(floor) {
+			ordermanager.RemoveOrder(floor, def.BT_HallDown)
+		}
+	}
 }
 
 func ChooseDirection(floor int, dir def.Direction) def.Direction {
 	switch dir {
 	case def.Up:
-		if ordermanager.OrdersAbove(floor) {
+		if ordermanager.HasOrderAbove(floor) {
 			return def.Up
-		} else if ordermanager.OrdersBelow(floor) {
+		} else if ordermanager.HasOrderBelow(floor) {
 			return def.Down
 		}
 	case def.Down, def.Stop:
-		if ordermanager.OrdersBelow(floor) {
+		if ordermanager.HasOrderBelow(floor) {
 			return def.Down
-		} else if ordermanager.OrdersAbove(floor) {
+		} else if ordermanager.HasOrderAbove(floor) {
 			return def.Up
 		}
 	}
