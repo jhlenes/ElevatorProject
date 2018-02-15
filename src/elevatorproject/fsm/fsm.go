@@ -7,7 +7,7 @@ import (
 	"time"
 
 	def "elevatorproject/definitions"
-	"elevatorproject/driver/elevio"
+	"elevatorproject/driver"
 	"elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
 )
@@ -35,7 +35,7 @@ var watchdogTimerResetCh chan bool = make(chan bool)
 func main() {
 
 	// Initializations
-	elevio.Init(def.Addr, def.NumFloors)
+	driver.Init(def.Addr, def.NumFloors)
 	initFsm()
 
 	// Channels
@@ -44,10 +44,10 @@ func main() {
 	drvObstr := make(chan bool)
 	drvStop := make(chan bool)
 
-	go elevio.PollButtons(drvButtons)
-	go elevio.PollFloorSensor(drvFloors)
-	go elevio.PollObstructionSwitch(drvObstr)
-	go elevio.PollStopButton(drvStop)
+	go driver.PollButtons(drvButtons)
+	go driver.PollFloorSensor(drvFloors)
+	go driver.PollObstructionSwitch(drvObstr)
+	go driver.PollStopButton(drvStop)
 
 	// Listen to channels
 	for {
@@ -61,16 +61,16 @@ func main() {
 		case a := <-drvObstr:
 			log.Printf("Obstruction: %+v\n", a)
 			if a {
-				elevio.SetMotorDirection(def.Stop)
+				driver.SetMotorDirection(def.Stop)
 			} else {
-				elevio.SetMotorDirection(def.Up)
+				driver.SetMotorDirection(def.Up)
 			}
 
 		case a := <-drvStop:
 			log.Printf("Stop: %+v\n", a)
 			/*for f := 0; f < def.NumFloors; f++ {
 				for b := def.ButtonType(0); b < 3; b++ {
-					elevio.SetButtonLamp(b, f, false)
+					driver.SetButtonLamp(b, f, false)
 				}
 			}*/
 		}
@@ -103,13 +103,13 @@ func onNewOrder(button def.ButtonEvent) {
 		ordermanager.AddOrder(button.Floor, button.Button)
 	case Idle:
 		if Elevator.Floor == button.Floor {
-			elevio.SetDoorOpenLamp(true)
+			driver.SetDoorOpenLamp(true)
 			Elevator.Behaviour = DoorOpen
 			doorTimerResetCh <- true
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-			elevio.SetMotorDirection(Elevator.Dir)
+			driver.SetMotorDirection(Elevator.Dir)
 			Elevator.Behaviour = Moving
 		}
 	}
@@ -124,13 +124,13 @@ func onFloorArrival(newFloor int) {
 		Elevator.Dir = def.Stop
 	}
 
-	elevio.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
+	driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
 
 	Elevator.Floor = newFloor
-	elevio.SetFloorIndicator(newFloor)
+	driver.SetFloorIndicator(newFloor)
 	if scheduler.ShouldStop(Elevator.Floor, Elevator.Dir) {
-		elevio.SetMotorDirection(def.Stop)
-		elevio.SetDoorOpenLamp(true)
+		driver.SetMotorDirection(def.Stop)
+		driver.SetDoorOpenLamp(true)
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
 		resetDoorTimer()
 		Elevator.Behaviour = DoorOpen
@@ -143,8 +143,8 @@ func onDoorTimeout() {
 	resetWatchdogTimer()
 
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-	elevio.SetDoorOpenLamp(false)
-	elevio.SetMotorDirection(Elevator.Dir)
+	driver.SetDoorOpenLamp(false)
+	driver.SetMotorDirection(Elevator.Dir)
 	if Elevator.Dir == def.Stop {
 		Elevator.Behaviour = Idle
 	} else {
@@ -159,7 +159,7 @@ func onWatchdogTimeout() {
 	switch Elevator.Behaviour {
 	case Idle:
 		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-		elevio.SetMotorDirection(Elevator.Dir)
+		driver.SetMotorDirection(Elevator.Dir)
 		if Elevator.Dir == def.Stop {
 			Elevator.Behaviour = Idle
 		} else {
@@ -167,16 +167,18 @@ func onWatchdogTimeout() {
 		}
 	case DoorOpen:
 		// TODO: Figure out if this can happen and what to do
+		onDoorTimeout()
 	case Moving: // Elevator is stuck
+		// TODO: Figure out what to do here
 		// try to restart motor
-		elevio.SetMotorDirection(Elevator.Dir)
+		driver.SetMotorDirection(Elevator.Dir)
 	}
 }
 
 func setAllLights() {
 	for floor := 0; floor < def.NumFloors; floor++ {
 		for btn := def.ButtonType(0); btn < def.NumButtons; btn++ {
-			elevio.SetButtonLamp(btn, floor, ordermanager.HasOrder(floor, btn))
+			driver.SetButtonLamp(btn, floor, ordermanager.HasOrder(floor, btn))
 		}
 	}
 }
@@ -199,6 +201,7 @@ func doorTimer(resetCh chan bool) {
 }
 
 func resetWatchdogTimer() {
+	// TODO: sync button lights here?
 	watchdogTimerResetCh <- true
 }
 
@@ -220,7 +223,7 @@ func safeShutdown() {
 	var c = make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 	<-c
-	elevio.SetMotorDirection(def.Stop)
+	driver.SetMotorDirection(def.Stop)
 	log.Println("User terminated the program.")
 	os.Exit(1)
 }
