@@ -63,7 +63,7 @@ func main() {
 			if a {
 				driver.SetMotorDirection(def.Stop)
 			} else {
-				driver.SetMotorDirection(def.Up)
+				driver.SetMotorDirection(Elevator.Dir)
 			}
 
 		case a := <-drvStop:
@@ -95,7 +95,7 @@ func onNewOrder(button def.ButtonEvent) {
 	switch Elevator.Behaviour {
 	case DoorOpen:
 		if Elevator.Floor == button.Floor {
-			doorTimerResetCh <- true
+			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 		}
@@ -105,7 +105,7 @@ func onNewOrder(button def.ButtonEvent) {
 		if Elevator.Floor == button.Floor {
 			driver.SetDoorOpenLamp(true)
 			Elevator.Behaviour = DoorOpen
-			doorTimerResetCh <- true
+			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
@@ -172,6 +172,7 @@ func onWatchdogTimeout() {
 		// TODO: Figure out what to do here
 		// try to restart motor
 		driver.SetMotorDirection(Elevator.Dir)
+		// broadcast stuck status? let other elevators take its orders
 	}
 }
 
