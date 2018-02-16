@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"time"
@@ -59,7 +58,7 @@ func main() {
 			onFloorArrival(floor)
 
 		case a := <-drvObstr:
-			log.Printf("Obstruction: %+v\n", a)
+			def.Info.Printf("Obstruction: %+v\n", a)
 			if a {
 				driver.SetMotorDirection(def.Stop)
 			} else {
@@ -67,7 +66,7 @@ func main() {
 			}
 
 		case a := <-drvStop:
-			log.Printf("Stop: %+v\n", a)
+			def.Info.Printf("Stop: %+v\n", a)
 			/*for f := 0; f < def.NumFloors; f++ {
 				for b := def.ButtonType(0); b < 3; b++ {
 					driver.SetButtonLamp(b, f, false)
@@ -89,7 +88,7 @@ func initFsm() {
 }
 
 func onNewOrder(button def.ButtonEvent) {
-	log.Printf("New request: %+v", button)
+	def.Info.Printf("New request: %+v", button)
 	resetWatchdogTimer()
 
 	switch Elevator.Behaviour {
@@ -117,7 +116,7 @@ func onNewOrder(button def.ButtonEvent) {
 }
 
 func onFloorArrival(newFloor int) {
-	log.Printf("Arrived at floor %v.", newFloor)
+	def.Info.Printf("Arrived at floor %v.", newFloor)
 	resetWatchdogTimer()
 
 	if Elevator.Floor == -1 { // elevator was initialized between floors
@@ -139,7 +138,7 @@ func onFloorArrival(newFloor int) {
 }
 
 func onDoorTimeout() {
-	log.Printf("Door timedout.")
+	def.Info.Printf("Door timedout.")
 	resetWatchdogTimer()
 
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
@@ -153,7 +152,7 @@ func onDoorTimeout() {
 }
 
 func onWatchdogTimeout() {
-	log.Printf("Watchdog timedout.")
+	def.Info.Printf("Watchdog timedout.")
 	resetWatchdogTimer()
 
 	switch Elevator.Behaviour {
@@ -225,6 +224,6 @@ func safeShutdown() {
 	signal.Notify(c, os.Interrupt)
 	<-c
 	driver.SetMotorDirection(def.Stop)
-	log.Println("User terminated the program.")
+	def.Info.Println("User terminated the program.")
 	os.Exit(1)
 }
