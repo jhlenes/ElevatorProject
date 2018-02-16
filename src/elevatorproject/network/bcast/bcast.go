@@ -1,7 +1,7 @@
 package bcast
 
 import (
-	"../conn"
+	"elevatorproject/network/conn"
 	"encoding/json"
 	"fmt"
 	"net"
