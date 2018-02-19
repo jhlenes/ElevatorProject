@@ -6,8 +6,7 @@ const NumElevators = 3
 
 const Addr = "localhost:15657"
 
-const DoorTimeout = 3000     // ms
-const WatchdogTimeout = 5000 // ms
+const DoorTimeout = 3000 // ms
 
 type Direction int
 
