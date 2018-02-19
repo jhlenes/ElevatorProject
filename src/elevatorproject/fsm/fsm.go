@@ -1,13 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"time"
 
 	def "elevatorproject/definitions"
-	"elevatorproject/driver/elevio"
+	"elevatorproject/driver"
 	"elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
 )
@@ -28,12 +27,14 @@ var Elevator struct {
 	ID        string
 }
 
+// Channels used to reset timers
 var doorTimerResetCh chan bool = make(chan bool)
+var watchdogTimerResetCh chan bool = make(chan bool)
 
 func main() {
 
 	// Initializations
-	elevio.Init(def.Addr, def.NumFloors)
+	driver.Init(def.Addr, def.NumFloors)
 	initFsm()
 
 	// Channels
@@ -42,37 +43,35 @@ func main() {
 	drvObstr := make(chan bool)
 	drvStop := make(chan bool)
 
-	go elevio.PollButtons(drvButtons)
-	go elevio.PollFloorSensor(drvFloors)
-	go elevio.PollObstructionSwitch(drvObstr)
-	go elevio.PollStopButton(drvStop)
+	go driver.PollButtons(drvButtons)
+	go driver.PollFloorSensor(drvFloors)
+	go driver.PollObstructionSwitch(drvObstr)
+	go driver.PollStopButton(drvStop)
 
 	// Listen to channels
 	for {
 		select {
 		case button := <-drvButtons:
-			fmt.Printf("%+v\n", button)
-			onNewRequest(button)
+			onNewOrder(button)
 
 		case floor := <-drvFloors:
-			fmt.Printf("%+v\n", floor)
 			onFloorArrival(floor)
 
 		case a := <-drvObstr:
-			fmt.Printf("%+v\n", a)
+			def.Info.Printf("Obstruction: %+v\n", a)
 			if a {
-				elevio.SetMotorDirection(def.Stop)
+				driver.SetMotorDirection(def.Stop)
 			} else {
-				elevio.SetMotorDirection(def.Up)
+				driver.SetMotorDirection(Elevator.Dir)
 			}
 
 		case a := <-drvStop:
-			fmt.Printf("%+v\n", a)
-			for f := 0; f < def.NumFloors; f++ {
+			def.Info.Printf("Stop: %+v\n", a)
+			/*for f := 0; f < def.NumFloors; f++ {
 				for b := def.ButtonType(0); b < 3; b++ {
-					elevio.SetButtonLamp(b, f, false)
+					driver.SetButtonLamp(b, f, false)
 				}
-			}
+			}*/
 		}
 	}
 }
@@ -85,13 +84,17 @@ func initFsm() {
 
 	go safeShutdown()
 	go doorTimer(doorTimerResetCh)
+	go watchdogTimer(watchdogTimerResetCh)
 }
 
-func onNewRequest(button def.ButtonEvent) {
+func onNewOrder(button def.ButtonEvent) {
+	def.Info.Printf("New request: %+v", button)
+	resetWatchdogTimer()
+
 	switch Elevator.Behaviour {
 	case DoorOpen:
 		if Elevator.Floor == button.Floor {
-			doorTimerResetCh <- true
+			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 		}
@@ -99,68 +102,89 @@ func onNewRequest(button def.ButtonEvent) {
 		ordermanager.AddOrder(button.Floor, button.Button)
 	case Idle:
 		if Elevator.Floor == button.Floor {
-			elevio.SetDoorOpenLamp(true)
+			driver.SetDoorOpenLamp(true)
 			Elevator.Behaviour = DoorOpen
-			doorTimerResetCh <- true
+			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-			elevio.SetMotorDirection(Elevator.Dir)
+			driver.SetMotorDirection(Elevator.Dir)
 			Elevator.Behaviour = Moving
 		}
 	}
 	setAllLights()
 }
 
-func checkDirection(newFloor int) {
-	oldFloor := Elevator.Floor
-	if oldFloor == -1 { // elevator was initialized between floors
-		Elevator.Dir = def.Stop
-		elevio.SetMotorDirection(def.Stop)
-	} else {
-		if newFloor-oldFloor > 0 {
-			Elevator.Dir = def.Up
-		} else if newFloor-oldFloor < 0 {
-			Elevator.Dir = def.Down
-		} else {
-			Elevator.Dir = def.Stop
-		}
-	}
-}
-
 func onFloorArrival(newFloor int) {
-	checkDirection(newFloor)
+	def.Info.Printf("Arrived at floor %v.", newFloor)
+	resetWatchdogTimer()
+
+	if Elevator.Floor == -1 { // elevator was initialized between floors
+		Elevator.Dir = def.Stop
+	}
+
+	driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
 
 	Elevator.Floor = newFloor
-	elevio.SetFloorIndicator(newFloor)
+	driver.SetFloorIndicator(newFloor)
 	if scheduler.ShouldStop(Elevator.Floor, Elevator.Dir) {
-		elevio.SetMotorDirection(def.Stop)
-		elevio.SetDoorOpenLamp(true)
+		driver.SetMotorDirection(def.Stop)
+		driver.SetDoorOpenLamp(true)
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
-		doorTimerResetCh <- true
+		resetDoorTimer()
 		Elevator.Behaviour = DoorOpen
 		setAllLights()
 	}
 }
 
 func onDoorTimeout() {
+	def.Info.Printf("Door timedout.")
+	resetWatchdogTimer()
+
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-	elevio.SetDoorOpenLamp(false)
-	elevio.SetMotorDirection(Elevator.Dir)
+	driver.SetDoorOpenLamp(false)
+	driver.SetMotorDirection(Elevator.Dir)
 	if Elevator.Dir == def.Stop {
 		Elevator.Behaviour = Idle
 	} else {
 		Elevator.Behaviour = Moving
-		elevio.SetMotorDirection(Elevator.Dir)
+	}
+}
+
+func onWatchdogTimeout() {
+	def.Info.Printf("Watchdog timedout.")
+	resetWatchdogTimer()
+
+	switch Elevator.Behaviour {
+	case Idle:
+		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
+		driver.SetMotorDirection(Elevator.Dir)
+		if Elevator.Dir == def.Stop {
+			Elevator.Behaviour = Idle
+		} else {
+			Elevator.Behaviour = Moving
+		}
+	case DoorOpen:
+		// TODO: Figure out if this can happen and what to do
+		onDoorTimeout()
+	case Moving: // Elevator is stuck
+		// TODO: Figure out what to do here
+		// try to restart motor
+		driver.SetMotorDirection(Elevator.Dir)
+		// broadcast stuck status? let other elevators take its orders
 	}
 }
 
 func setAllLights() {
 	for floor := 0; floor < def.NumFloors; floor++ {
 		for btn := def.ButtonType(0); btn < def.NumButtons; btn++ {
-			elevio.SetButtonLamp(btn, floor, ordermanager.HasOrder(floor, btn))
+			driver.SetButtonLamp(btn, floor, ordermanager.HasOrder(floor, btn))
 		}
 	}
+}
+
+func resetDoorTimer() {
+	doorTimerResetCh <- true
 }
 
 func doorTimer(resetCh chan bool) {
@@ -171,7 +195,25 @@ func doorTimer(resetCh chan bool) {
 		case <-resetCh:
 			timer.Reset(def.DoorTimeout * time.Millisecond)
 		case <-timer.C:
-			onDoorTimeout()
+			go onDoorTimeout()
+		}
+	}
+}
+
+func resetWatchdogTimer() {
+	// TODO: sync button lights here?
+	watchdogTimerResetCh <- true
+}
+
+func watchdogTimer(resetCh chan bool) {
+	timer := time.NewTimer(def.WatchdogTimeout * time.Millisecond)
+	timer.Stop()
+	for {
+		select {
+		case <-resetCh:
+			timer.Reset(def.WatchdogTimeout * time.Millisecond)
+		case <-timer.C:
+			go onWatchdogTimeout()
 		}
 	}
 }
@@ -181,7 +223,7 @@ func safeShutdown() {
 	var c = make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 	<-c
-	elevio.SetMotorDirection(def.Stop)
-	fmt.Println("User terminated the program")
+	driver.SetMotorDirection(def.Stop)
+	def.Info.Println("User terminated the program.")
 	os.Exit(1)
 }
