@@ -1,13 +1,10 @@
 package driver
 
-import (
-	"fmt"
-	"net"
-	"sync"
-	"time"
-
-	def "elevatorproject/definitions"
-)
+import "time"
+import "sync"
+import "net"
+import "fmt"
+import def "elevatorproject/definitions"
 
 const _pollRate = 20 * time.Millisecond
 
@@ -26,7 +23,7 @@ func Init(addr string, numFloors int) {
 	var err error
 	_conn, err = net.Dial("tcp", addr)
 	if err != nil {
-		def.Error.Fatalf("Could not connect to elevator at: %v\n > %v", addr, err.Error())
+		panic(err.Error())
 	}
 
 	// Reset elevator states

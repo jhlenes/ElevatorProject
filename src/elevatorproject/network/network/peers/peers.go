@@ -1,7 +1,7 @@
 package peers
 
 import (
-	"elevatorproject/network/conn"
+	"../conn"
 	"fmt"
 	"net"
 	"sort"
