@@ -1,13 +1,14 @@
-package main
+package network
 
 import (
-	"./network/bcast"
-	"./network/localip"
-	"./network/peers"
 	"flag"
 	"fmt"
 	"os"
 	"time"
+
+	"elevatorproject/network/bcast"
+	"elevatorproject/network/localip"
+	"elevatorproject/network/peers"
 )
 
 // We define some custom struct to send over the network.
