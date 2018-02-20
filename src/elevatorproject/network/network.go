@@ -1,15 +1,69 @@
 package network
 
 import (
+	"elevatorproject/ordermanager"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
+	def "elevatorproject/definitions"
 	"elevatorproject/network/bcast"
 	"elevatorproject/network/localip"
 	"elevatorproject/network/peers"
 )
+
+type orderMsg struct {
+	id     string
+	orders def.Matrix
+}
+
+func Init(id string, orders *def.Matrix) {
+	peerUpdateCh := make(chan peers.PeerUpdate)
+	// We can disable/enable the transmitter after it has been started.
+	// This could be used to signal that we are somehow "unavailable".
+	peerTxEnable := make(chan bool)
+	go peers.Transmitter(15647, id, peerTxEnable)
+	go peers.Receiver(15647, peerUpdateCh)
+
+	// We make channels for sending and receiving our custom data types
+	ordersTx := make(chan orderMsg)
+	ordersRx := make(chan orderMsg)
+	// ... and start the transmitter/receiver pair on some port
+	// These functions can take any number of channels! It is also possible to
+	//  start multiple transmitters/receivers on the same port.
+	go bcast.Transmitter(16569, ordersTx)
+	go bcast.Receiver(16569, ordersRx)
+
+	// get regular updates on the orders
+	ordersUpdate := make(chan def.Matrix)
+	go ordermanager.PollOrders(ordersUpdate)
+
+	go func() {
+		for {
+			select {
+			case p := <-peerUpdateCh:
+				fmt.Printf("Peer update:\n")
+				fmt.Printf("  Peers:    %q\n", p.Peers)
+				fmt.Printf("  New:      %q\n", p.New)
+				fmt.Printf("  Lost:     %q\n", p.Lost)
+
+			case a := <-ordersRx:
+				id := a.id
+				fmt.Printf("%T == %T\n", id, def.LocalID)
+				if id != def.LocalID {
+					orders := a.orders
+					ordermanager.AddMatrix(id, orders)
+					fmt.Printf("Received: %T\n", a)
+				}
+			case a := <-ordersUpdate:
+				msg := orderMsg{def.LocalID, a}
+				fmt.Printf("%T\n", msg)
+				ordersTx <- msg
+			}
+		}
+	}()
+}
 
 // We define some custom struct to send over the network.
 // Note that all members we want to transmit must be public. Any private members

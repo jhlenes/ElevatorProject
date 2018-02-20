@@ -1,31 +1,21 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
+	"elevatorproject/network"
 	"elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
 )
 
-type ElevatorBehaviour int
-
-// Elevator behaviours
-const (
-	Idle ElevatorBehaviour = iota
-	DoorOpen
-	Moving
-)
-
-var Elevator struct {
-	Floor     int
-	Dir       def.Direction
-	Behaviour ElevatorBehaviour
-	ID        string
-}
+var Elevator def.Elevator
 
 // Channels used to reset timers
 var doorTimerResetCh chan bool = make(chan bool)
@@ -34,8 +24,11 @@ var watchdogTimerResetCh chan bool = make(chan bool)
 func main() {
 
 	// Initializations
-	driver.Init(def.Addr, def.NumFloors)
 	initFsm()
+	driver.Init(fmt.Sprintf("%s%d", def.Addr, def.Port), def.NumFloors)
+	var orders def.Matrix
+	ordermanager.Init()
+	network.Init(Elevator.ID, &orders)
 
 	// Channels
 	drvButtons := make(chan def.ButtonEvent)
@@ -79,8 +72,20 @@ func main() {
 func initFsm() {
 	Elevator.Floor = -1
 	Elevator.Dir = def.Stop
-	Elevator.Behaviour = Idle
-	Elevator.ID = "A"
+	Elevator.Behaviour = def.Idle
+
+	var id string
+	flag.StringVar(&id, "id", "", "id of this peer")
+	flag.Parse()
+
+	i, err := strconv.Atoi(id)
+	if err != nil {
+		def.Error.Fatalf("ID is not an integer: %v", id)
+	}
+	def.Port += i
+
+	def.LocalID = id
+	Elevator.ID = id
 
 	go safeShutdown()
 	go doorTimer(doorTimerResetCh)
@@ -92,24 +97,24 @@ func onNewOrder(button def.ButtonEvent) {
 	resetWatchdogTimer()
 
 	switch Elevator.Behaviour {
-	case DoorOpen:
+	case def.DoorOpen:
 		if Elevator.Floor == button.Floor {
 			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 		}
-	case Moving:
+	case def.Moving:
 		ordermanager.AddOrder(button.Floor, button.Button)
-	case Idle:
+	case def.Idle:
 		if Elevator.Floor == button.Floor {
 			driver.SetDoorOpenLamp(true)
-			Elevator.Behaviour = DoorOpen
+			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
 		} else {
 			ordermanager.AddOrder(button.Floor, button.Button)
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 			driver.SetMotorDirection(Elevator.Dir)
-			Elevator.Behaviour = Moving
+			Elevator.Behaviour = def.Moving
 		}
 	}
 	setAllLights()
@@ -132,7 +137,7 @@ func onFloorArrival(newFloor int) {
 		driver.SetDoorOpenLamp(true)
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
 		resetDoorTimer()
-		Elevator.Behaviour = DoorOpen
+		Elevator.Behaviour = def.DoorOpen
 		setAllLights()
 	}
 }
@@ -145,9 +150,9 @@ func onDoorTimeout() {
 	driver.SetDoorOpenLamp(false)
 	driver.SetMotorDirection(Elevator.Dir)
 	if Elevator.Dir == def.Stop {
-		Elevator.Behaviour = Idle
+		Elevator.Behaviour = def.Idle
 	} else {
-		Elevator.Behaviour = Moving
+		Elevator.Behaviour = def.Moving
 	}
 }
 
@@ -156,18 +161,18 @@ func onWatchdogTimeout() {
 	resetWatchdogTimer()
 
 	switch Elevator.Behaviour {
-	case Idle:
+	case def.Idle:
 		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 		driver.SetMotorDirection(Elevator.Dir)
 		if Elevator.Dir == def.Stop {
-			Elevator.Behaviour = Idle
+			Elevator.Behaviour = def.Idle
 		} else {
-			Elevator.Behaviour = Moving
+			Elevator.Behaviour = def.Moving
 		}
-	case DoorOpen:
+	case def.DoorOpen:
 		// TODO: Figure out if this can happen and what to do
 		onDoorTimeout()
-	case Moving: // Elevator is stuck
+	case def.Moving: // Elevator is stuck
 		// TODO: Figure out what to do here
 		// try to restart motor
 		driver.SetMotorDirection(Elevator.Dir)

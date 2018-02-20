@@ -5,14 +5,19 @@ import (
 	"os"
 )
 
+var LocalID string = "0"
+
 const NumFloors = 4
 const NumButtons = 3
 const NumElevators = 3
 
-const Addr = "localhost:15657"
+const Addr = "localhost:"
+
+var Port = 15657
 
 const DoorTimeout = 3000     // ms
 const WatchdogTimeout = 5000 // ms
+const SendTime = 2000        // ms
 
 // Loggers
 var Info = log.New(os.Stdout,
@@ -41,4 +46,28 @@ const (
 type ButtonEvent struct {
 	Floor  int
 	Button ButtonType
+}
+
+type Order struct {
+	Status int
+	Cost   int
+	Owner  string
+}
+
+type Matrix [NumFloors][NumButtons]Order
+
+type ElevatorBehaviour int
+
+// Elevator behaviours
+const (
+	Idle ElevatorBehaviour = iota
+	DoorOpen
+	Moving
+)
+
+type Elevator struct {
+	Floor     int
+	Dir       Direction
+	Behaviour ElevatorBehaviour
+	ID        string
 }
