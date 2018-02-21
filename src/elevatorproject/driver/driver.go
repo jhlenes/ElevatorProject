@@ -35,7 +35,7 @@ func Init(addr string, numFloors int) {
 	if f := getFloor(); f == -1 {
 		SetMotorDirection(def.Up)
 	} else {
-		SetMotorDirection(def.Up)
+		SetMotorDirection(def.Stop)
 		SetFloorIndicator(f)
 	}
 	for f := 0; f < def.NumFloors; f++ {

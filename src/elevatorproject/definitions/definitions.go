@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var LocalID string = "0"
+var LocalID int = 0
 
 const NumFloors = 4
 const NumButtons = 3
@@ -48,13 +48,17 @@ type ButtonEvent struct {
 	Button ButtonType
 }
 
-type Order struct {
+type order struct {
 	Status int
 	Cost   int
-	Owner  string
+	Owner  int
 }
 
-type Matrix [NumFloors][NumButtons]Order
+func NewOrder() order {
+	return order{0, 9999, -1}
+}
+
+type Matrix [NumFloors][NumButtons]order
 
 type ElevatorBehaviour int
 
@@ -69,5 +73,5 @@ type Elevator struct {
 	Floor     int
 	Dir       Direction
 	Behaviour ElevatorBehaviour
-	ID        string
+	ID        int
 }

@@ -20,17 +20,17 @@ func ShouldStop(floor int, dir def.Direction) bool {
 }
 
 func ClearOrders(floor int, dir def.Direction) {
-	ordermanager.RemoveOrder(floor, def.BT_Cab)
+	ordermanager.UpdateOrder(floor, def.BT_Cab)
 	switch dir {
 	case def.Down:
-		ordermanager.RemoveOrder(floor, def.BT_HallDown)
+		ordermanager.UpdateOrder(floor, def.BT_HallDown)
 		if !ordermanager.HasOrderBelow(floor) {
-			ordermanager.RemoveOrder(floor, def.BT_HallUp)
+			ordermanager.UpdateOrder(floor, def.BT_HallUp)
 		}
 	case def.Up:
-		ordermanager.RemoveOrder(floor, def.BT_HallUp)
+		ordermanager.UpdateOrder(floor, def.BT_HallUp)
 		if !ordermanager.HasOrderAbove(floor) {
-			ordermanager.RemoveOrder(floor, def.BT_HallDown)
+			ordermanager.UpdateOrder(floor, def.BT_HallDown)
 		}
 	}
 }
