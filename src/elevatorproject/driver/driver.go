@@ -1,91 +1,96 @@
 package driver
 
 import (
-	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
-
-	def "elevatorproject/definitions"
 )
 
-const _pollRate = 20 * time.Millisecond
+type MotorDirection int
 
-var _initialized bool = false
-var _numFloors int = 4
-var _mtx sync.Mutex
-var _conn net.Conn
+const (
+	MD_Down MotorDirection = -1
+	MD_Stop MotorDirection = 0
+	MD_Up   MotorDirection = 1
+)
+
+type ButtonType int
+
+const (
+	BT_HallUp   ButtonType = 0
+	BT_HallDown ButtonType = 1
+	BT_Cab      ButtonType = 2
+)
+
+type ButtonEvent struct {
+	Floor  int
+	Button ButtonType
+}
+
+const pollRate = 20 * time.Millisecond
+const buttonCount = 3
+
+var initialized bool = false
+var floorCount int = 4
+var mutex sync.Mutex
+var conn net.Conn
 
 func Init(addr string, numFloors int) {
-	if _initialized {
-		fmt.Println("Driver already initialized!")
+	if initialized {
+		log.Println("Driver already initialized!")
 		return
 	}
-	_numFloors = numFloors
-	_mtx = sync.Mutex{}
+	floorCount = numFloors
+	mutex = sync.Mutex{}
 	var err error
-	_conn, err = net.Dial("tcp", addr)
+	conn, err = net.Dial("tcp", addr)
 	if err != nil {
-		def.Error.Fatalf("Could not connect to elevator at: %v\n > %v", addr, err.Error())
+		log.Fatalf("ERROR: Could not connect to elevator at: %v\n > %v", addr, err.Error())
 	}
 
-	// Reset elevator states
-	SetDoorOpenLamp(false)
-	SetStopLamp(false)
-	if f := getFloor(); f == -1 {
-		SetMotorDirection(def.Up)
-	} else {
-		SetMotorDirection(def.Stop)
-		SetFloorIndicator(f)
-	}
-	for f := 0; f < def.NumFloors; f++ {
-		for b := def.ButtonType(0); b < def.NumButtons; b++ {
-			SetButtonLamp(b, f, false)
-		}
-	}
-
-	_initialized = true
+	initialized = true
 }
 
-func SetMotorDirection(dir def.Direction) {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{1, byte(dir), 0, 0})
+func SetMotorDirection(dir MotorDirection) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{1, byte(dir), 0, 0})
 }
 
-func SetButtonLamp(button def.ButtonType, floor int, value bool) {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{2, byte(button), byte(floor), toByte(value)})
+func SetButtonLamp(button ButtonType, floor int, value bool) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{2, byte(button), byte(floor), toByte(value)})
 }
 
 func SetFloorIndicator(floor int) {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{3, byte(floor), 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{3, byte(floor), 0, 0})
 }
 
 func SetDoorOpenLamp(value bool) {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{4, toByte(value), 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{4, toByte(value), 0, 0})
 }
 
 func SetStopLamp(value bool) {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{5, toByte(value), 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{5, toByte(value), 0, 0})
 }
 
-func PollButtons(receiver chan<- def.ButtonEvent) {
-	prev := make([][3]bool, _numFloors)
+func PollButtons(receiver chan<- ButtonEvent) {
+	prev := make([][3]bool, floorCount)
 	for {
-		time.Sleep(_pollRate)
-		for f := 0; f < _numFloors; f++ {
-			for b := def.ButtonType(0); b < 3; b++ {
+		time.Sleep(pollRate)
+		for f := 0; f < floorCount; f++ {
+			for b := ButtonType(0); b < buttonCount; b++ {
 				v := getButton(b, f)
 				if v != prev[f][b] && v != false {
-					receiver <- def.ButtonEvent{f, def.ButtonType(b)}
+					receiver <- ButtonEvent{f, ButtonType(b)}
 				}
 				prev[f][b] = v
 			}
@@ -96,7 +101,7 @@ func PollButtons(receiver chan<- def.ButtonEvent) {
 func PollFloorSensor(receiver chan<- int) {
 	prev := -1
 	for {
-		time.Sleep(_pollRate)
+		time.Sleep(pollRate)
 		v := getFloor()
 		if v != prev && v != -1 {
 			receiver <- v
@@ -108,7 +113,7 @@ func PollFloorSensor(receiver chan<- int) {
 func PollStopButton(receiver chan<- bool) {
 	prev := false
 	for {
-		time.Sleep(_pollRate)
+		time.Sleep(pollRate)
 		v := getStop()
 		if v != prev {
 			receiver <- v
@@ -120,7 +125,7 @@ func PollStopButton(receiver chan<- bool) {
 func PollObstructionSwitch(receiver chan<- bool) {
 	prev := false
 	for {
-		time.Sleep(_pollRate)
+		time.Sleep(pollRate)
 		v := getObstruction()
 		if v != prev {
 			receiver <- v
@@ -129,21 +134,21 @@ func PollObstructionSwitch(receiver chan<- bool) {
 	}
 }
 
-func getButton(button def.ButtonType, floor int) bool {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{6, byte(button), byte(floor), 0})
+func getButton(button ButtonType, floor int) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{6, byte(button), byte(floor), 0})
 	var buf [4]byte
-	_conn.Read(buf[:])
+	conn.Read(buf[:])
 	return toBool(buf[1])
 }
 
 func getFloor() int {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{7, 0, 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{7, 0, 0, 0})
 	var buf [4]byte
-	_conn.Read(buf[:])
+	conn.Read(buf[:])
 	if buf[1] != 0 {
 		return int(buf[2])
 	} else {
@@ -152,20 +157,20 @@ func getFloor() int {
 }
 
 func getStop() bool {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{8, 0, 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{8, 0, 0, 0})
 	var buf [4]byte
-	_conn.Read(buf[:])
+	conn.Read(buf[:])
 	return toBool(buf[1])
 }
 
 func getObstruction() bool {
-	_mtx.Lock()
-	defer _mtx.Unlock()
-	_conn.Write([]byte{9, 0, 0, 0})
+	mutex.Lock()
+	defer mutex.Unlock()
+	conn.Write([]byte{9, 0, 0, 0})
 	var buf [4]byte
-	_conn.Read(buf[:])
+	conn.Read(buf[:])
 	return toBool(buf[1])
 }
 

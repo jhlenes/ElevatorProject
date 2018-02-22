@@ -1,4 +1,4 @@
-package main
+package fsm
 
 import (
 	def "elevatorproject/definitions"
@@ -9,17 +9,16 @@ import (
 )
 
 // Channels used to reset timers
-var doorTimerResetCh chan bool = make(chan bool)
-var watchdogTimerResetCh chan bool = make(chan bool)
+var doorTimerResetCh chan bool = make(chan bool, 10)
+var watchdogTimerResetCh chan bool = make(chan bool, 10)
 
 func onDoorTimeout() {
-	def.Info.Printf("Door timedout.")
 	resetWatchdogTimer()
 
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 	driver.SetDoorOpenLamp(false)
 	driver.SetMotorDirection(Elevator.Dir)
-	if Elevator.Dir == def.Stop {
+	if Elevator.Dir == driver.MD_Stop {
 		Elevator.Behaviour = def.Idle
 	} else {
 		Elevator.Behaviour = def.Moving
@@ -45,14 +44,13 @@ func doorTimer(resetCh chan bool) {
 
 func onWatchdogTimeout() {
 	resetWatchdogTimer()
-	setAllLights() // TODO: should not be here
 
 	switch Elevator.Behaviour {
 	case def.Idle:
 		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 		driver.SetMotorDirection(Elevator.Dir)
-		if Elevator.Dir == def.Stop {
-			moveIfIdleAndHasOrderOnCurrentFloor()
+		if Elevator.Dir == driver.MD_Stop {
+			completOrdersOnCurrentFloor()
 		} else {
 			Elevator.Behaviour = def.Moving
 		}
@@ -68,7 +66,7 @@ func onWatchdogTimeout() {
 }
 
 func resetWatchdogTimer() {
-	// TODO: sync button lights here?
+	SetAllLights([]int{0, 1})
 	watchdogTimerResetCh <- true
 }
 
@@ -85,21 +83,22 @@ func watchdogTimer(resetCh chan bool) {
 	}
 }
 
-func moveIfIdleAndHasOrderOnCurrentFloor() {
-	if ordermanager.HasOrder(Elevator.Floor, def.BT_HallUp) {
-		Elevator.Dir = def.Up
+func completOrdersOnCurrentFloor() {
+	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	if orderMatrix.HasOrder(Elevator.Floor, driver.BT_HallUp) {
+		Elevator.Dir = driver.MD_Up
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
 		driver.SetDoorOpenLamp(true)
 		Elevator.Behaviour = def.DoorOpen
 		resetDoorTimer()
-	} else if ordermanager.HasOrder(Elevator.Floor, def.BT_HallDown) {
-		Elevator.Dir = def.Down
+	} else if orderMatrix.HasOrder(Elevator.Floor, driver.BT_HallDown) {
+		Elevator.Dir = driver.MD_Down
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
 		driver.SetDoorOpenLamp(true)
 		Elevator.Behaviour = def.DoorOpen
 		resetDoorTimer()
-	} else if ordermanager.HasOrder(Elevator.Floor, def.BT_Cab) {
-		scheduler.ClearOrders(Elevator.Floor, def.Stop)
+	} else if orderMatrix.HasOrder(Elevator.Floor, driver.BT_Cab) {
+		scheduler.ClearOrders(Elevator.Floor, driver.MD_Stop)
 		driver.SetDoorOpenLamp(true)
 		Elevator.Behaviour = def.DoorOpen
 		resetDoorTimer()

@@ -1,64 +1,27 @@
 package definitions
 
 import (
+	"elevatorproject/driver"
 	"log"
 	"os"
 )
 
-var LocalID int = 0
-
-const NumFloors = 4
-const NumButtons = 3
-const NumElevators = 3
-
-const Addr = "localhost:"
-
+var LocalID = 0
+var Addr = "localhost"
 var Port = 15657
 
+const FloorCount = 4
+const ButtonCount = 3
+const ElevatorCount = 3
+
+const TRAVEL_TIME = 2000     // ms
 const DoorTimeout = 3000     // ms
 const WatchdogTimeout = 5000 // ms
-const SendTime = 2000        // ms
+const SendTime = 1000        // ms
 
-// Loggers
-var Info = log.New(os.Stdout,
-	"INFO: ",
-	log.Ltime)
-var Error = log.New(os.Stderr,
-	"ERROR: ",
-	log.Ltime|log.Lshortfile)
-
-type Direction int
-
-const (
-	Up   Direction = 1
-	Down           = -1
-	Stop           = 0
-)
-
-type ButtonType int
-
-const (
-	BT_HallUp   ButtonType = 0
-	BT_HallDown            = 1
-	BT_Cab                 = 2
-)
-
-type ButtonEvent struct {
-	Floor  int
-	Button ButtonType
-}
-
-type order struct {
-	Status int
-	Cost   int
-	Owner  int
-}
-
-func NewOrder() order {
-	return order{0, 9999, -1}
-}
-
-type Matrix [NumFloors][NumButtons]order
+// Setup and format logger messages
+var Info = log.New(os.Stdout, "INFO: ", log.Ltime)
+var Error = log.New(os.Stderr, "ERROR: ", log.Ltime|log.Lshortfile)
 
 type ElevatorBehaviour int
 
@@ -67,11 +30,12 @@ const (
 	Idle ElevatorBehaviour = iota
 	DoorOpen
 	Moving
+	Initializing
 )
 
 type Elevator struct {
 	Floor     int
-	Dir       Direction
+	Dir       driver.MotorDirection
 	Behaviour ElevatorBehaviour
 	ID        int
 }
