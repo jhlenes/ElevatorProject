@@ -35,6 +35,10 @@ func GetLocalOrderMatrix() *OrderMatrix {
 	return &OrderMatrices[def.LocalID]
 }
 
+func ButtonPressed(floor int, button driver.ButtonType) bool {
+	return OrderMatrices[def.LocalID][floor][button].Status != 0
+}
+
 func HasSystemOrder(floor int, button driver.ButtonType, ids []int) bool {
 	for _, id := range ids {
 		if OrderMatrices[id][floor][button].Status != 1 {
@@ -75,12 +79,27 @@ func (m *OrderMatrix) RemoveOrder(floor int, button driver.ButtonType) {
 }
 
 func (m *OrderMatrix) UpdateOrder(floor int, button driver.ButtonType) {
-	m[floor][button].Status = 2
+	if m[floor][button].Status == 1 {
+		if button == driver.BT_Cab {
+			m[floor][button] = createEmptyOrder()
+		} else {
+			m[floor][button].Status = 2
+		}
+	}
 }
 
 func (m *OrderMatrix) AddOrder(floor int, button driver.ButtonType, cost int) {
-	m[floor][button].Status = 1
-	m[floor][button].Cost = cost
+	if m[floor][button].Status == 0 {
+		m[floor][button].Status = 1
+		m[floor][button].Cost = cost
+	}
+}
+
+func (m *OrderMatrix) AddCabOrder(floor int, owner int) {
+	if m[floor][driver.BT_Cab].Status == 0 {
+		m[floor][driver.BT_Cab].Status = 1
+		m[floor][driver.BT_Cab].Owner = owner
+	}
 }
 
 func AddMatrix(id int, newMatrix OrderMatrix) {
@@ -88,14 +107,17 @@ func AddMatrix(id int, newMatrix OrderMatrix) {
 }
 
 func createEmptyOrder() order {
-	return order{0, 9999, -1}
+	return order{0, -1, -1}
 }
 
-func printOrder(orders OrderMatrix) {
+func PrintOrder(orders OrderMatrix) {
 	var buffer bytes.Buffer
 	for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 		for f := 0; f < def.FloorCount; f++ {
-			buffer.WriteString(fmt.Sprintf("%v|%v|%v  ", orders[f][b].Status, orders[f][b].Cost, orders[f][b].Owner))
+			buffer.WriteString(fmt.Sprintf("%v", orders[f][b].Status))
+			if f != def.FloorCount-1 {
+				buffer.WriteString(" | ")
+			}
 		}
 		buffer.WriteString("\n")
 	}

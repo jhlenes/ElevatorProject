@@ -20,8 +20,8 @@ type ordersMsg struct {
 func Init() {
 
 	// Listen for other peers and send own status
-	peerUpdateCh := make(chan peers.PeerUpdate)
-	peerTxEnable := make(chan bool)
+	peerUpdateCh := make(chan peers.PeerUpdate, 10)
+	peerTxEnable := make(chan bool, 10)
 	go peers.Transmitter(15647, strconv.Itoa(def.LocalID), peerTxEnable)
 	go peers.Receiver(15647, peerUpdateCh)
 
@@ -32,7 +32,7 @@ func Init() {
 	go bcast.Receiver(16569, ordersRx)
 
 	// send regular updates on the orders
-	ordersUpdate := make(chan ordermanager.OrderMatrix)
+	ordersUpdate := make(chan ordermanager.OrderMatrix, 10)
 	go func() {
 		for {
 			time.Sleep(def.SendTime * time.Millisecond)

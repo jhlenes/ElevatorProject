@@ -4,7 +4,6 @@ import (
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
 	"elevatorproject/ordermanager"
-	"fmt"
 )
 
 func ShouldStop(floor int, dir driver.MotorDirection) bool {
@@ -24,44 +23,48 @@ func ChooseDirection(floor int, dir driver.MotorDirection) driver.MotorDirection
 
 func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
 	orderMatrix := ordermanager.GetLocalOrderMatrix()
-	cost := CalculateCost(elevator, button, floor)
-	orderMatrix.AddOrder(floor, button, cost)
-	fmt.Printf("Cost: %v\n", cost)
+	if !ordermanager.ButtonPressed(floor, button) {
+		if button != driver.BT_Cab {
+			cost := timeToIdle(elevator, *orderMatrix, floor, button)
+			orderMatrix.AddOrder(floor, button, cost)
+		} else {
+			orderMatrix.AddCabOrder(floor, def.LocalID)
+		}
+	}
 }
 
-func CalculateCost(eOld def.Elevator, button driver.ButtonType, floor int) int {
-	e := eOld
-	ordersCopy := *ordermanager.GetLocalOrderMatrix()
-	ordersCopy[floor][button].Status = 1
-	ordersCopy[floor][button].Owner = def.LocalID
+func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor int, button driver.ButtonType) int {
+	// add order to local copy of orderMatrix
+	orderMatrix[floor][button].Status = 1
+	orderMatrix[floor][button].Owner = def.LocalID
 
 	arrivedAtRequest := false
 	duration := 0
 
-	switch e.Behaviour {
+	switch elev.Behaviour {
 	case def.Idle:
-		e.Dir = chooseDirection(e.Floor, e.Dir, &ordersCopy)
-		if e.Dir == driver.MD_Stop {
+		elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
+		if elev.Dir == driver.MD_Stop {
 			return duration*10 + def.LocalID
 		}
 	case def.Moving:
 		duration += def.TRAVEL_TIME / 2
-		e.Floor += int(e.Dir)
+		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
 		duration -= def.DoorTimeout / 2
 	}
 
 	for {
-		if shouldStop(e.Floor, e.Dir, &ordersCopy) {
-			clearOrders(e.Floor, e.Dir, &ordersCopy)
-			arrivedAtRequest = !ordersCopy.HasOrder(floor, button)
+		if shouldStop(elev.Floor, elev.Dir, &orderMatrix) {
+			clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+			arrivedAtRequest = !orderMatrix.HasOrder(floor, button)
 			if arrivedAtRequest {
 				return duration*10 + def.LocalID
 			}
 			duration += def.DoorTimeout
-			e.Dir = chooseDirection(e.Floor, e.Dir, &ordersCopy)
+			elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
 		}
-		e.Floor += int(e.Dir)
+		elev.Floor += int(elev.Dir)
 		duration += def.TRAVEL_TIME
 	}
 }

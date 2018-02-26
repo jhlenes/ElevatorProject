@@ -30,36 +30,23 @@ func listenForDriverEvents() {
 
 	// Create channels and start polling events
 	drvButtons := make(chan driver.ButtonEvent, 10)
-	drvFloors := make(chan int)
-	drvObstr := make(chan bool)
-	drvStop := make(chan bool)
+	drvFloors := make(chan int, 10)
 	go driver.PollButtons(drvButtons)
 	go driver.PollFloorSensor(drvFloors)
-	go driver.PollObstructionSwitch(drvObstr)
-	go driver.PollStopButton(drvStop)
 
 	// Listen for events at the channels
 	for {
 		select {
 		case button := <-drvButtons:
-			def.Info.Println(button)
 			go onButtonPress(button)
 
 		case floor := <-drvFloors:
-			onFloorArrival(floor)
-
-		case a := <-drvObstr:
-			def.Info.Printf("Obstruction: %+v\n", a)
-
-		case a := <-drvStop:
-			def.Info.Printf("Stop: %+v\n", a)
+			go onFloorArrival(floor)
 		}
 	}
 }
 
 func OnNewOrder(floor int, button driver.ButtonType) {
-	resetWatchdogTimer()
-
 	switch Elevator.Behaviour {
 	case def.DoorOpen: // if door is open, at correct floor and going in button direction => clear order
 		if Elevator.Floor == floor {
@@ -91,7 +78,10 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 }
 
 func onButtonPress(buttonEvent driver.ButtonEvent) {
-	resetWatchdogTimer()
+	def.Info.Println("onButtonPress")
+	if ordermanager.ButtonPressed(buttonEvent.Floor, buttonEvent.Button) {
+		return
+	}
 
 	orderCompleted := false
 	switch Elevator.Behaviour {
@@ -139,7 +129,7 @@ func onFloorArrival(newFloor int) {
 func SetAllLights(elevatorIds []int) {
 	for floor := 0; floor < def.FloorCount; floor++ {
 		for btn := driver.ButtonType(0); btn < def.ButtonCount; btn++ {
-			driver.SetButtonLamp(btn, floor, ordermanager.HasSystemOrder(floor, btn, elevatorIds))
+			driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasOrder(floor, btn))
 		}
 	}
 }

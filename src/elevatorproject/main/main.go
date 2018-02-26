@@ -27,11 +27,11 @@ func main() {
 	fsm.Init()
 	network.Init()
 
-	safeShutdown()
+	waitForShutdownSignal()
 }
 
-// safeShutdown shutdowns the program in a safe way when terminataed by user (ctrl+c)
-func safeShutdown() {
+// waitForShutdownSignal shutdowns the program in a safe way when terminated by user (ctrl+c)
+func waitForShutdownSignal() {
 	var c = make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 	<-c

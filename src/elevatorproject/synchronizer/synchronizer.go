@@ -33,6 +33,9 @@ func Synchronize(peers []string, new string, lost []string) {
 
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
+			if b == driver.BT_Cab {
+				continue
+			}
 
 			// assuming 2 elevators
 			if om.OrderMatrices[def.LocalID][f][b].Status < om.OrderMatrices[id][f][b].Status { // update status to higher number
