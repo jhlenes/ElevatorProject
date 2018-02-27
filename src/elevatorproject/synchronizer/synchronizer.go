@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+
 func getIdsFromPeers(peers []string) []int {
 	ids := []int{}
 	for _, peer := range peers {
@@ -24,7 +25,7 @@ func getIdsFromPeers(peers []string) []int {
 }
 
 func Synchronize(peers []string, new string, lost []string) {
-	ids := getIdsFromPeers(peers)
+	//ids := getIdsFromPeers(peers)
 
 	id := 0
 	if def.LocalID == 0 {
@@ -37,23 +38,23 @@ func Synchronize(peers []string, new string, lost []string) {
 				continue
 			}
 
+
 			// assuming 2 elevators
 			if om.OrderMatrices[def.LocalID][f][b].Status < om.OrderMatrices[id][f][b].Status { // update status to higher number
 
-				if om.OrderMatrices[id][f][b].Status == 1 { // new order
+				if om.OrderMatrices[id][f][b].Status == om.OS_Existing { // new order
 					scheduler.AddOrder(fsm.Elevator, f, b)
-					fsm.SetAllLights(ids)
-				} else if om.OrderMatrices[id][f][b].Status == 2 { // finished order
-					om.OrderMatrices[def.LocalID][f][b].Status = 2
-					fsm.SetAllLights(ids)
-				} else if om.OrderMatrices[def.LocalID][f][b].Status != 0 && om.OrderMatrices[id][f][b].Status == 3 { // deleting order
-					om.OrderMatrices[def.LocalID][f][b].Status = 3
-					fsm.SetAllLights(ids)
+					
+				} else if om.OrderMatrices[id][f][b].Status == om.OS_Completed { // finished order
+					om.OrderMatrices[def.LocalID][f][b].Status = om.OS_Completed
+				} else if om.OrderMatrices[def.LocalID][f][b].Status != om.OS_Empty && om.OrderMatrices[id][f][b].Status == om.OS_Removing { // deleting order
+					om.OrderMatrices[def.LocalID][f][b].Status = om.OS_Removing
 				}
+				fsm.SetAllLights()
 
 			} else if om.OrderMatrices[def.LocalID][f][b].Status == om.OrderMatrices[id][f][b].Status { // equal status
 
-				if om.OrderMatrices[id][f][b].Status == 1 && om.OrderMatrices[def.LocalID][f][b].Owner < 0 { // both status 1 => decide owner
+				if om.OrderMatrices[id][f][b].Status == om.OS_Existing && om.OrderMatrices[def.LocalID][f][b].Owner < 0 { // both status 1 => decide owner
 					if om.OrderMatrices[id][f][b].Owner >= 0 { // copy owner
 						om.OrderMatrices[def.LocalID][f][b].Owner = om.OrderMatrices[id][f][b].Owner
 					} else { // decide owner
@@ -67,14 +68,18 @@ func Synchronize(peers []string, new string, lost []string) {
 						fsm.OnNewOrder(f, b)
 						def.Info.Print("We have a new order")
 					}
-				} else if om.OrderMatrices[id][f][b].Status == 2 { //  TODO: check that all have finished order
-					om.OrderMatrices[def.LocalID][f][b].Status = 3
-				} else if om.OrderMatrices[def.LocalID][f][b].Status == 3 {
+				} else if om.OrderMatrices[id][f][b].Status == om.OS_Completed { //  TODO: check that all have finished order
+					om.OrderMatrices[def.LocalID][f][b].Status = om.OS_Removing
+				} else if om.OrderMatrices[def.LocalID][f][b].Status == om.OS_Removing {
 					om.OrderMatrices[def.LocalID].RemoveOrder(f, b)
+					fsm.SetAllLights()
 				}
-			} else if om.OrderMatrices[def.LocalID][f][b].Status == 3 && om.OrderMatrices[id][f][b].Status == 0 { //
+			} else if om.OrderMatrices[def.LocalID][f][b].Status == om.OS_Removing && om.OrderMatrices[id][f][b].Status == om.OS_Empty { //
 				om.OrderMatrices[def.LocalID].RemoveOrder(f, b)
+				fsm.SetAllLights()
 			}
 		}
 	}
+
+
 }

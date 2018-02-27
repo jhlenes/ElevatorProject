@@ -7,8 +7,17 @@ import (
 	"fmt"
 )
 
+type OrderStatus int
+
+const(
+	OS_Empty OrderStatus = 0
+	OS_Existing OrderStatus = 1
+	OS_Completed OrderStatus = 2
+	OS_Removing OrderStatus = 3
+)
+
 type order struct {
-	Status int
+	Status OrderStatus
 	Cost   int
 	Owner  int
 }
@@ -50,6 +59,10 @@ func HasSystemOrder(floor int, button driver.ButtonType, ids []int) bool {
 
 func (m *OrderMatrix) HasOrder(floor int, button driver.ButtonType) bool {
 	return m[floor][button].Owner == def.LocalID && m[floor][button].Status == 1
+}
+
+func (m *OrderMatrix) HasSystemOrder(floor int, button driver.ButtonType) bool {
+	return m[floor][button].Owner != -1 && m[floor][button].Status == 1
 }
 
 func (m *OrderMatrix) HasOrderAbove(floor int) bool {

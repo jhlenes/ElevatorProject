@@ -22,14 +22,14 @@ func Init() {
 	// Listen for other peers and send own status
 	peerUpdateCh := make(chan peers.PeerUpdate, 10)
 	peerTxEnable := make(chan bool, 10)
-	go peers.Transmitter(15647, strconv.Itoa(def.LocalID), peerTxEnable)
-	go peers.Receiver(15647, peerUpdateCh)
+	go peers.Transmitter(15699, strconv.Itoa(def.LocalID), peerTxEnable)
+	go peers.Receiver(15699, peerUpdateCh)
 
 	// Set up channels for broadcasting and listening for orders
 	ordersTx := make(chan ordersMsg, 10)
 	ordersRx := make(chan ordersMsg, 10)
-	go bcast.Transmitter(16569, ordersTx)
-	go bcast.Receiver(16569, ordersRx)
+	go bcast.Transmitter(16539, ordersTx)
+	go bcast.Receiver(16539, ordersRx)
 
 	// send regular updates on the orders
 	ordersUpdate := make(chan ordermanager.OrderMatrix, 10)

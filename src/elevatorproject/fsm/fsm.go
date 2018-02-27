@@ -126,10 +126,14 @@ func onFloorArrival(newFloor int) {
 	}
 }
 
-func SetAllLights(elevatorIds []int) {
+func SetAllLights() {
 	for floor := 0; floor < def.FloorCount; floor++ {
 		for btn := driver.ButtonType(0); btn < def.ButtonCount; btn++ {
-			driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasOrder(floor, btn))
+			if btn == driver.BT_Cab {
+				driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasOrder(floor, btn))
+			} else {
+				driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasSystemOrder(floor, btn))
+			}
 		}
 	}
 }

@@ -26,6 +26,7 @@ func onDoorTimeout() {
 }
 
 func resetDoorTimer() {
+	SetAllLights()
 	doorTimerResetCh <- true
 }
 
@@ -66,7 +67,6 @@ func onWatchdogTimeout() {
 }
 
 func resetWatchdogTimer() {
-	SetAllLights([]int{0, 1})
 	watchdogTimerResetCh <- true
 }
 
