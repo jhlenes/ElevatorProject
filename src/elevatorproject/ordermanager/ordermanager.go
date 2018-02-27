@@ -127,7 +127,7 @@ func PrintOrder(orders OrderMatrix) {
 	var buffer bytes.Buffer
 	for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 		for f := 0; f < def.FloorCount; f++ {
-			buffer.WriteString(fmt.Sprintf("%v", orders[f][b].Status))
+			buffer.WriteString(fmt.Sprintf("%v", orders[f][b].Cost))
 			if f != def.FloorCount-1 {
 				buffer.WriteString(" | ")
 			}
