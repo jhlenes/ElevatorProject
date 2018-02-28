@@ -17,7 +17,22 @@ type ordersMsg struct {
 	Orders ordermanager.OrderMatrix
 }
 
+var elevatorTimers [def.ElevatorCount]*time.Timer
+
 func Init() {
+
+	elevatorTimeoutCh := make(chan int, 10)
+
+	// Create timers for each elevator and have them send the elevator id to a shared channel on timeout
+	for i := range elevatorTimers {
+		elevatorTimers[i] = time.NewTimer(def.ElevatorTimeout * time.Second)
+		elevatorTimers[i].Stop()
+		go func(timer *time.Timer, id int) {
+			for range timer.C {
+				elevatorTimeoutCh <- id
+			}
+		}(elevatorTimers[i], i)
+	}
 
 	// Listen for other peers and send own status
 	peerUpdateCh := make(chan peers.PeerUpdate, 10)
@@ -53,11 +68,18 @@ func Init() {
 
 			case msg := <-ordersRx:
 				if msg.ID != def.LocalID {
+					elevatorTimers[msg.ID].Reset(def.ElevatorTimeout * time.Second)
 					ordermanager.AddMatrix(msg.ID, msg.Orders)
 					synchronizer.Synchronize(elevators.Peers, elevators.New, elevators.Lost)
 				}
+
 			case orders := <-ordersUpdate:
 				ordersTx <- ordersMsg{def.LocalID, orders}
+
+			case id := <-elevatorTimeoutCh:
+				elevatorTimers[id].Stop()
+				def.Info.Printf("Elevator %v timed out!\n", id)
+				synchronizer.ReassignOrders(elevators.Peers, id)
 			}
 		}
 	}()

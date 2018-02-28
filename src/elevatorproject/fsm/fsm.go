@@ -81,8 +81,10 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 			scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
 		} else {
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-			driver.SetMotorDirection(Elevator.Dir)
-			Elevator.Behaviour = def.Moving
+			if Elevator.Dir != driver.MD_Stop {
+				driver.SetMotorDirection(Elevator.Dir)
+				Elevator.Behaviour = def.Moving
+			}
 		}
 	}
 
@@ -122,6 +124,9 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 	if buttonEvent.Button == driver.BT_Cab {
 		SetAllLights()
 	}
+	def.Info.Printf("%v\n", Elevator)
+	def.Info.Println("onButtonPress: END")
+
 }
 
 func onFloorArrival(newFloor int) {

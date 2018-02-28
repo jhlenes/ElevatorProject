@@ -48,15 +48,6 @@ func ButtonPressed(floor int, button driver.ButtonType) bool {
 	return OrderMatrices[def.LocalID][floor][button].Status != 0
 }
 
-func HasSystemOrder(floor int, button driver.ButtonType, ids []int) bool {
-	for _, id := range ids {
-		if OrderMatrices[id][floor][button].Status != 1 {
-			return false
-		}
-	}
-	return true
-}
-
 func (m *OrderMatrix) HasOrder(floor int, button driver.ButtonType) bool {
 	return m[floor][button].Owner == def.LocalID && m[floor][button].Status == 1
 }

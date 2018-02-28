@@ -24,6 +24,13 @@ func main() {
 	def.Addr = addr
 	def.Port = port
 
+	/*go func() {
+		for {
+			ordermanager.PrintOrder(*ordermanager.GetLocalOrderMatrix())
+			time.Sleep(1 * time.Second)
+		}
+	}()*/
+
 	fsm.Init()
 	network.Init()
 
