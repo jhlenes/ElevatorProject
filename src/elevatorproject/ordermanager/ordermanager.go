@@ -9,11 +9,11 @@ import (
 
 type OrderStatus int
 
-const(
-	OS_Empty OrderStatus = 0
-	OS_Existing OrderStatus = 1
+const (
+	OS_Empty     OrderStatus = 0
+	OS_Existing  OrderStatus = 1
 	OS_Completed OrderStatus = 2
-	OS_Removing OrderStatus = 3
+	OS_Removing  OrderStatus = 3
 )
 
 type order struct {

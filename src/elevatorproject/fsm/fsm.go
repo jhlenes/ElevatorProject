@@ -9,6 +9,7 @@ import (
 )
 
 var Elevator def.Elevator
+var buttonStatus [def.FloorCount][def.ButtonCount]bool
 
 func Init() {
 	// Initialize driver
@@ -20,6 +21,14 @@ func Init() {
 	driver.SetMotorDirection(driver.MD_Up)
 	Elevator.Behaviour = def.Initializing
 	Elevator.ID = def.LocalID
+
+	// Reset all lights
+	for floor := 0; floor < def.FloorCount; floor++ {
+		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
+			driver.SetButtonLamp(button, floor, false)
+		}
+	}
+	driver.SetDoorOpenLamp(false)
 
 	go doorTimer(doorTimerResetCh)
 	go watchdogTimer(watchdogTimerResetCh)
@@ -38,7 +47,9 @@ func listenForDriverEvents() {
 	for {
 		select {
 		case button := <-drvButtons:
-			go onButtonPress(button)
+			if Elevator.Behaviour != def.Initializing {
+				go onButtonPress(button)
+			}
 
 		case floor := <-drvFloors:
 			go onFloorArrival(floor)
@@ -79,9 +90,6 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 
 func onButtonPress(buttonEvent driver.ButtonEvent) {
 	def.Info.Println("onButtonPress")
-	if ordermanager.ButtonPressed(buttonEvent.Floor, buttonEvent.Button) {
-		return
-	}
 
 	orderCompleted := false
 	switch Elevator.Behaviour {
@@ -96,11 +104,23 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
 			orderCompleted = true
+		} else if buttonEvent.Button == driver.BT_Cab {
+
+			// We can start a cab order without confirmation from other elevators
+			scheduler.AddOrder(Elevator, buttonEvent.Floor, buttonEvent.Button)
+			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
+			driver.SetMotorDirection(Elevator.Dir)
+			Elevator.Behaviour = def.Moving
+			orderCompleted = true
 		}
 	}
 
 	if !orderCompleted {
 		scheduler.AddOrder(Elevator, buttonEvent.Floor, buttonEvent.Button)
+	}
+
+	if buttonEvent.Button == driver.BT_Cab {
+		SetAllLights()
 	}
 }
 
@@ -110,10 +130,10 @@ func onFloorArrival(newFloor int) {
 	if Elevator.Behaviour == def.Initializing {
 		Elevator.Behaviour = def.Idle
 		Elevator.Dir = driver.MD_Stop
-		def.Info.Printf("Done initializing")
+		driver.SetMotorDirection(Elevator.Dir)
 	}
 
-	driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
+	//driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
 
 	Elevator.Floor = newFloor
 	driver.SetFloorIndicator(newFloor)
@@ -121,19 +141,30 @@ func onFloorArrival(newFloor int) {
 		driver.SetMotorDirection(driver.MD_Stop)
 		driver.SetDoorOpenLamp(true)
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
-		resetDoorTimer()
 		Elevator.Behaviour = def.DoorOpen
+		resetDoorTimer()
+		SetAllLights()
 	}
 }
 
 func SetAllLights() {
 	for floor := 0; floor < def.FloorCount; floor++ {
-		for btn := driver.ButtonType(0); btn < def.ButtonCount; btn++ {
-			if btn == driver.BT_Cab {
-				driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasOrder(floor, btn))
-			} else {
-				driver.SetButtonLamp(btn, floor, ordermanager.GetLocalOrderMatrix().HasSystemOrder(floor, btn))
-			}
+		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
+			SetLight(floor, button)
+		}
+	}
+}
+
+func SetLight(floor int, button driver.ButtonType) {
+	if button == driver.BT_Cab {
+		if bStatus := ordermanager.GetLocalOrderMatrix().HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
+			driver.SetButtonLamp(button, floor, bStatus)
+			buttonStatus[floor][button] = bStatus
+		}
+	} else {
+		if bStatus := ordermanager.GetLocalOrderMatrix().HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
+			driver.SetButtonLamp(button, floor, bStatus)
+			buttonStatus[floor][button] = bStatus
 		}
 	}
 }
