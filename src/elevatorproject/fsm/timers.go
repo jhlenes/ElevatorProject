@@ -83,7 +83,7 @@ func watchdogTimer(resetCh chan bool) {
 }
 
 func completeOrdersOnCurrentFloor() {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetMatrix(def.LocalID)
 	if orderMatrix.HasOrder(Elevator.Floor, driver.BT_HallUp) {
 		Elevator.Dir = driver.MD_Up
 		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)

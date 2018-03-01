@@ -7,22 +7,22 @@ import (
 )
 
 func ShouldStop(floor int, dir driver.MotorDirection) bool {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetMatrix(def.LocalID)
 	return shouldStop(floor, dir, orderMatrix)
 }
 
 func ClearOrders(floor int, dir driver.MotorDirection) {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetMatrix(def.LocalID)
 	clearOrders(floor, dir, orderMatrix)
 }
 
 func ChooseDirection(floor int, dir driver.MotorDirection) driver.MotorDirection {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetMatrix(def.LocalID)
 	return chooseDirection(floor, dir, orderMatrix)
 }
 
 func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetMatrix(def.LocalID)
 	if !ordermanager.ButtonPressed(floor, button) {
 		if button != driver.BT_Cab {
 			cost := timeToIdle(elevator, *orderMatrix, floor, button)
@@ -35,8 +35,8 @@ func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
 
 func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor int, button driver.ButtonType) int {
 	// add order to local copy of orderMatrix
-	orderMatrix[floor][button].Status = 1
-	orderMatrix[floor][button].Owner = def.LocalID
+	orderMatrix.SetStatus(floor, button, 1)
+	orderMatrix.SetOwner(floor, button, def.LocalID)
 
 	arrivedAtRequest := false
 	duration := 0
@@ -51,7 +51,7 @@ func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor i
 		duration += def.TRAVEL_TIME / 2
 		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
-		duration -= def.DoorTimeout / 2
+		duration += def.DoorTimeout / 2
 	}
 
 	for {

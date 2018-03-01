@@ -6,38 +6,21 @@ import (
 	"elevatorproject/fsm"
 	om "elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
-	"log"
-	"strconv"
 )
 
-func getIdsFromPeers(peers []string) []int {
-	ids := []int{}
-	for _, peer := range peers {
-		id, err := strconv.Atoi(peer)
-		if err != nil {
-			log.Println("Id of a peer is not an integer.")
-		} else {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
-func ReassignOrders(peers []string, id int) {
-	ids := getIdsFromPeers(peers)
-
+func ReassignOrders(ids []int, id int) {
 	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
 
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 
 			// Reassign orders owned by <id> to the elevator with the lowest cost
-			if om.OrderMatrices[def.LocalID][f][b].Owner == id {
-				om.OrderMatrices[id].RemoveOrder(f, b)
+			if om.GetMatrix(def.LocalID).GetOwner(f, b) == id {
+				om.GetMatrix(def.LocalID).RemoveOrder(f, b)
 				if cost, bestId := getCost(ids, f, b); cost >= 0 { // TODO: what if cost is < 0 ?
 					setOwner(bestId, f, b)
 					if bestId == def.LocalID {
-						fsm.OnNewOrder(f, b)
+						go fsm.OnNewOrder(f, b)
 					}
 				}
 			}
@@ -47,20 +30,16 @@ func ReassignOrders(peers []string, id int) {
 	}
 }
 
-func Synchronize(peers []string, new string, lost []string) {
-	ids := getIdsFromPeers(peers)
-
+func Synchronize(ids []int) {
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 			if b == driver.BT_Cab {
 				continue
 			}
 
-			switch om.OrderMatrices[def.LocalID][f][b].Status {
+			switch om.GetMatrix(def.LocalID).GetStatus(f, b) {
 			case om.OS_Empty:
-				if anyRemoving(ids, f, b) {
-					// do nothing
-				} else if anyCompleted(ids, f, b) {
+				if anyCompleted(ids, f, b) {
 					setStatus(om.OS_Completed, f, b)
 				} else if anyExisting(ids, f, b) {
 					if owner := getOwner(ids, f, b); owner >= 0 {
@@ -89,17 +68,15 @@ func Synchronize(peers []string, new string, lost []string) {
 			case om.OS_Removing:
 				if !anyExisting(ids, f, b) && !anyCompleted(ids, f, b) {
 					setStatus(om.OS_Empty, f, b)
-
 				}
 			}
 		}
 	}
-
 }
 
 func anyRemoving(ids []int, floor int, button driver.ButtonType) bool {
 	for _, id := range ids {
-		if om.OrderMatrices[id][floor][button].Status == om.OS_Removing {
+		if om.GetMatrix(id).GetStatus(floor, button) == om.OS_Removing {
 			return true
 		}
 	}
@@ -108,7 +85,7 @@ func anyRemoving(ids []int, floor int, button driver.ButtonType) bool {
 
 func anyCompleted(ids []int, floor int, button driver.ButtonType) bool {
 	for _, id := range ids {
-		if om.OrderMatrices[id][floor][button].Status == om.OS_Completed {
+		if om.GetMatrix(id).GetStatus(floor, button) == om.OS_Completed {
 			return true
 		}
 	}
@@ -117,7 +94,7 @@ func anyCompleted(ids []int, floor int, button driver.ButtonType) bool {
 
 func anyExisting(ids []int, floor int, button driver.ButtonType) bool {
 	for _, id := range ids {
-		if om.OrderMatrices[id][floor][button].Status == om.OS_Existing {
+		if om.GetMatrix(id).GetStatus(floor, button) == om.OS_Existing {
 			return true
 		}
 	}
@@ -126,7 +103,7 @@ func anyExisting(ids []int, floor int, button driver.ButtonType) bool {
 
 func anyEmpty(ids []int, floor int, button driver.ButtonType) bool {
 	for _, id := range ids {
-		if om.OrderMatrices[id][floor][button].Status == om.OS_Empty {
+		if om.GetMatrix(id).GetStatus(floor, button) == om.OS_Empty {
 			return true
 		}
 	}
@@ -135,27 +112,27 @@ func anyEmpty(ids []int, floor int, button driver.ButtonType) bool {
 
 func setStatus(orderStatus om.OrderStatus, floor int, button driver.ButtonType) {
 	if orderStatus == om.OS_Completed {
-		om.GetLocalOrderMatrix().UpdateOrder(floor, button)
+		om.GetMatrix(def.LocalID).UpdateOrder(floor, button)
 	} else if orderStatus == om.OS_Empty {
-		om.GetLocalOrderMatrix().RemoveOrder(floor, button)
+		om.GetMatrix(def.LocalID).RemoveOrder(floor, button)
 	} else {
-		om.OrderMatrices[def.LocalID][floor][button].Status = orderStatus
+		om.GetMatrix(def.LocalID).SetStatus(floor, button, orderStatus)
 		fsm.SetAllLights()
 	}
 }
 
 func getOwner(ids []int, floor int, button driver.ButtonType) int {
 	for _, id := range ids {
-		if om.OrderMatrices[id][floor][button].Owner >= 0 {
-			return om.OrderMatrices[id][floor][button].Owner
+		if om.GetMatrix(id).GetOwner(floor, button) >= 0 {
+			return om.GetMatrix(id).GetOwner(floor, button)
 		}
 	}
 	return -1
 }
 
 func copyOrder(owner int, floor int, button driver.ButtonType) {
-	om.OrderMatrices[def.LocalID][floor][button].Status = om.OS_Existing
-	om.OrderMatrices[def.LocalID][floor][button].Owner = owner
+	om.GetMatrix(def.LocalID).SetStatus(floor, button, om.OS_Existing)
+	om.GetMatrix(def.LocalID).SetOwner(floor, button, owner)
 	fsm.SetAllLights()
 }
 
@@ -164,16 +141,16 @@ func addOrder(floor int, button driver.ButtonType) {
 }
 
 func setOwner(id int, f int, b driver.ButtonType) {
-	om.OrderMatrices[def.LocalID][f][b].Owner = id
+	om.GetMatrix(def.LocalID).SetOwner(f, b, id)
 	fsm.SetAllLights()
 }
 
 func getCost(ids []int, f int, b driver.ButtonType) (cost int, id int) {
 	bestId := ids[0]
-	lowestCost := om.OrderMatrices[ids[0]][f][b].Cost
+	lowestCost := om.GetMatrix(ids[0]).GetCost(f, b)
 	for _, id := range ids {
-		if om.OrderMatrices[id][f][b].Cost < lowestCost {
-			lowestCost = om.OrderMatrices[id][f][b].Cost
+		if om.GetMatrix(id).GetCost(f, b) < lowestCost {
+			lowestCost = om.GetMatrix(id).GetCost(f, b)
 			bestId = id
 		}
 	}

@@ -5,9 +5,11 @@ import (
 	"elevatorproject/driver"
 	"elevatorproject/fsm"
 	"elevatorproject/network"
+	"elevatorproject/ordermanager"
 	"flag"
 	"os"
 	"os/signal"
+	"time"
 )
 
 func main() {
@@ -24,12 +26,12 @@ func main() {
 	def.Addr = addr
 	def.Port = port
 
-	/*go func() {
+	go func() {
 		for {
-			ordermanager.PrintOrder(*ordermanager.GetLocalOrderMatrix())
-			time.Sleep(1 * time.Second)
+			ordermanager.PrintOrder(*ordermanager.GetMatrix(def.LocalID))
+			time.Sleep(3 * time.Second)
 		}
-	}()*/
+	}()
 
 	fsm.Init()
 	network.Init()

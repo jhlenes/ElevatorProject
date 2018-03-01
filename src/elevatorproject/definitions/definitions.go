@@ -17,7 +17,7 @@ const ElevatorCount = 3
 const TRAVEL_TIME = 2000     // ms
 const DoorTimeout = 3000     // ms
 const WatchdogTimeout = 5000 // ms
-const SendTime = 500         // ms
+const SendTime = 300         // ms
 const ElevatorTimeout = 10   // s
 
 // Setup and format logger messages

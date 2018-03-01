@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -47,40 +46,56 @@ func Init() {
 	go bcast.Receiver(16539, ordersRx)
 
 	// send regular updates on the orders
-	ordersUpdate := make(chan ordermanager.OrderMatrix, 10)
+	ordersUpdate := make(chan ordermanager.OrderMatrix, 1000)
 	go func() {
 		for {
 			time.Sleep(def.SendTime * time.Millisecond)
-			ordersUpdate <- *ordermanager.GetLocalOrderMatrix()
+			ordersUpdate <- *ordermanager.GetMatrix(def.LocalID)
 		}
 	}()
 
-	elevators := peers.PeerUpdate{}
+	onlineElevators := make(map[int]bool)
 	go func() {
 		for {
 			select {
-			case p := <-peerUpdateCh:
-				fmt.Printf("Peer update:\n")
-				fmt.Printf("  Peers:    %q\n", p.Peers)
-				fmt.Printf("  New:      %q\n", p.New)
-				fmt.Printf("  Lost:     %q\n", p.Lost)
-				elevators = p
+			/*case p := <-peerUpdateCh:
+			fmt.Printf("Peer update:\n")
+			fmt.Printf("  Peers:    %q\n", p.Peers)
+			fmt.Printf("  New:      %q\n", p.New)
+			fmt.Printf("  Lost:     %q\n", p.Lost)*/
 
 			case msg := <-ordersRx:
+				if _, ok := onlineElevators[msg.ID]; !ok {
+					onlineElevators[msg.ID] = true
+					def.Info.Printf("Peers: %v\n", getKeys(onlineElevators))
+				}
 				if msg.ID != def.LocalID {
 					elevatorTimers[msg.ID].Reset(def.ElevatorTimeout * time.Second)
-					ordermanager.AddMatrix(msg.ID, msg.Orders)
-					synchronizer.Synchronize(elevators.Peers, elevators.New, elevators.Lost)
+					if msg.Orders != *ordermanager.GetMatrix(msg.ID) {
+						ordermanager.AddMatrix(msg.ID, msg.Orders)
+					}
+					go synchronizer.Synchronize(getKeys(onlineElevators))
 				}
 
 			case orders := <-ordersUpdate:
 				ordersTx <- ordersMsg{def.LocalID, orders}
 
 			case id := <-elevatorTimeoutCh:
+				delete(onlineElevators, id)
+				def.Info.Printf("Peers: %v\n", getKeys(onlineElevators))
 				elevatorTimers[id].Stop()
-				def.Info.Printf("Elevator %v timed out!\n", id)
-				synchronizer.ReassignOrders(elevators.Peers, id)
+				go synchronizer.ReassignOrders(getKeys(onlineElevators), id)
 			}
 		}
 	}()
+}
+
+func getKeys(mymap map[int]bool) []int {
+	i := 0
+	keys := make([]int, len(mymap))
+	for k := range mymap {
+		keys[i] = k
+		i++
+	}
+	return keys
 }

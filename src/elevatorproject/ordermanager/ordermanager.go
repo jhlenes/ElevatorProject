@@ -5,6 +5,7 @@ import (
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
 	"fmt"
+	"sync"
 )
 
 type OrderStatus int
@@ -22,10 +23,10 @@ type order struct {
 	Owner  int
 }
 
-type OrderMatrix [def.FloorCount][def.ButtonCount]order
+var mutex = sync.Mutex{}
+var orderMatrices [def.ElevatorCount]OrderMatrix
 
-// TODO: maybe have a lock?
-var OrderMatrices [def.ElevatorCount]OrderMatrix
+type OrderMatrix [def.FloorCount][def.ButtonCount]order
 
 func init() {
 	// Create empty order matrices
@@ -36,16 +37,53 @@ func init() {
 		}
 	}
 	for elevId := 0; elevId < def.ElevatorCount; elevId++ {
-		OrderMatrices[elevId] = m
+		orderMatrices[elevId] = m
 	}
+
 }
 
-func GetLocalOrderMatrix() *OrderMatrix {
-	return &OrderMatrices[def.LocalID]
+func Lock() {
+	mutex.Lock()
+}
+
+func Unlock() {
+	mutex.Unlock()
+}
+
+func GetMatrix(id int) *OrderMatrix {
+	return &orderMatrices[id]
 }
 
 func ButtonPressed(floor int, button driver.ButtonType) bool {
-	return OrderMatrices[def.LocalID][floor][button].Status != 0
+	return orderMatrices[def.LocalID].GetStatus(floor, button) != 0
+}
+
+func (m *OrderMatrix) GetStatus(floor int, button driver.ButtonType) OrderStatus {
+	return m[floor][button].Status
+}
+
+func (m *OrderMatrix) SetStatus(floor int, button driver.ButtonType, status OrderStatus) {
+	m[floor][button].Status = status
+}
+
+func (m *OrderMatrix) GetOwner(floor int, button driver.ButtonType) int {
+	return m[floor][button].Owner
+}
+
+func (m *OrderMatrix) SetOwner(floor int, button driver.ButtonType, owner int) {
+	m[floor][button].Owner = owner
+}
+
+func (m *OrderMatrix) GetCost(floor int, button driver.ButtonType) int {
+	return m[floor][button].Cost
+}
+
+func (m *OrderMatrix) SetCost(floor int, button driver.ButtonType, cost int) {
+	m[floor][button].Cost = cost
+}
+
+func (m *OrderMatrix) IsEmpty(floor int, button driver.ButtonType) bool {
+	return m[floor][button].Status == OS_Empty
 }
 
 func (m *OrderMatrix) HasOrder(floor int, button driver.ButtonType) bool {
@@ -107,7 +145,7 @@ func (m *OrderMatrix) AddCabOrder(floor int, owner int) {
 }
 
 func AddMatrix(id int, newMatrix OrderMatrix) {
-	OrderMatrices[id] = newMatrix
+	orderMatrices[id] = newMatrix
 }
 
 func createEmptyOrder() order {
@@ -118,7 +156,7 @@ func PrintOrder(orders OrderMatrix) {
 	var buffer bytes.Buffer
 	for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 		for f := 0; f < def.FloorCount; f++ {
-			buffer.WriteString(fmt.Sprintf("%v", orders[f][b].Cost))
+			buffer.WriteString(fmt.Sprintf("%v:%v:%v", orders.GetStatus(f, b), orders.GetOwner(f, b), orders.GetCost(f, b)))
 			if f != def.FloorCount-1 {
 				buffer.WriteString(" | ")
 			}
