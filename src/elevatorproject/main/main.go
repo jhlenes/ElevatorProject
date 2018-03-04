@@ -6,8 +6,13 @@ import (
 	"elevatorproject/fsm"
 	"elevatorproject/network"
 	"flag"
+	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -24,16 +29,11 @@ func main() {
 	def.Addr = addr
 	def.Port = port
 
-	/*go func() {
-		for {
-			ordermanager.PrintOrder(*ordermanager.GetLocalOrderMatrix())
-			time.Sleep(1 * time.Second)
-		}
-	}()*/
-
 	fsm.Init()
 	network.Init()
 
+	//go printNumGoroutines()
+	go printGoroutineStackTracesOnSigquit()
 	waitForShutdownSignal()
 }
 
@@ -45,4 +45,23 @@ func waitForShutdownSignal() {
 	driver.SetMotorDirection(driver.MD_Stop)
 	def.Info.Println("User terminated the program.")
 	os.Exit(1)
+}
+
+// printGoroutineStackTracesOnSigquit is called when you press ^\ (Control+Backslash) and can be used to debug goroutines
+func printGoroutineStackTracesOnSigquit() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGQUIT)
+	buf := make([]byte, 1<<20)
+	for {
+		<-sigs
+		stacklen := runtime.Stack(buf, true)
+		log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+	}
+}
+
+func printNumGoroutines() {
+	for {
+		fmt.Printf("#goroutines: %d\n", runtime.NumGoroutine())
+		time.Sleep(1 * time.Second)
+	}
 }

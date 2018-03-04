@@ -91,8 +91,6 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 }
 
 func onButtonPress(buttonEvent driver.ButtonEvent) {
-	def.Info.Println("onButtonPress")
-
 	orderCompleted := false
 	switch Elevator.Behaviour {
 	case def.DoorOpen:
@@ -124,9 +122,6 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 	if buttonEvent.Button == driver.BT_Cab {
 		SetAllLights()
 	}
-	def.Info.Printf("%v\n", Elevator)
-	def.Info.Println("onButtonPress: END")
-
 }
 
 func onFloorArrival(newFloor int) {
