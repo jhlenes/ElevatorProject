@@ -91,9 +91,6 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 }
 
 func onButtonPress(buttonEvent driver.ButtonEvent) {
-	if !ordermanager.GetMatrix(def.LocalID).IsEmpty(buttonEvent.Floor, buttonEvent.Button) {
-		return
-	}
 	orderCompleted := false
 	switch Elevator.Behaviour {
 	case def.DoorOpen:
@@ -125,7 +122,6 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 	if buttonEvent.Button == driver.BT_Cab {
 		SetAllLights()
 	}
-
 }
 
 func onFloorArrival(newFloor int) {
