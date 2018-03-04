@@ -89,8 +89,6 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 }
 
 func onButtonPress(buttonEvent driver.ButtonEvent) {
-	def.Info.Println("onButtonPress")
-
 	orderCompleted := false
 	switch Elevator.Behaviour {
 	case def.DoorOpen:

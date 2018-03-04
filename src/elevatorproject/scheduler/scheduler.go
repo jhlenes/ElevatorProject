@@ -52,18 +52,30 @@ func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor i
 		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
 		duration -= def.DoorTimeout / 2
+		elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
 	}
 
 	for {
 		if shouldStop(elev.Floor, elev.Dir, &orderMatrix) {
 			clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+			duration += def.DoorTimeout
 			arrivedAtRequest = !orderMatrix.HasOrder(floor, button)
 			if arrivedAtRequest {
 				return duration*10 + def.LocalID
 			}
-			duration += def.DoorTimeout
 			elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
+		} else if elev.Dir == driver.MD_Stop {
+			if orderMatrix.HasOrder(elev.Floor, driver.BT_HallUp) {
+				elev.Dir = driver.MD_Up
+				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+			} else if orderMatrix.HasOrder(elev.Floor, driver.BT_HallDown) {
+				elev.Dir = driver.MD_Down
+				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+			} else if orderMatrix.HasOrder(elev.Floor, driver.BT_Cab) {
+				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+			}
 		}
+
 		elev.Floor += int(elev.Dir)
 		duration += def.TRAVEL_TIME
 	}
