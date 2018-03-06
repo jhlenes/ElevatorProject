@@ -72,7 +72,7 @@ func sendMessages(ordersTx chan ordersMsg) {
 	for {
 		time.Sleep(def.SendTime * time.Millisecond)
 		if fsm.Elevator.Behaviour != def.Stuck {
-			ordersTx <- ordersMsg{def.LocalID, *ordermanager.GetLocalOrderMatrix()}
+			ordersTx <- ordersMsg{def.LocalID, *ordermanager.GetOrders(def.LocalID).(*ordermanager.OrderMatrix)}
 		}
 	}
 }

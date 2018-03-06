@@ -3,7 +3,7 @@ package fsm
 import (
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
-	"elevatorproject/ordermanager"
+	om "elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
 	"fmt"
 )
@@ -129,16 +129,13 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 func onFloorArrival(newFloor int) {
 	resetWatchdogTimer()
 
-	if Elevator.Behaviour == def.Initializing || Elevator.Behaviour == def.Stuck {
+	if Elevator.Behaviour == def.Initializing {
 		Elevator.Behaviour = def.Idle
 		Elevator.Dir = driver.MD_Stop
 		driver.SetMotorDirection(Elevator.Dir)
-		if Elevator.Behaviour == def.Stuck {
-			completeOrdersOnCurrentFloor()
-		}
+	} else if Elevator.Behaviour == def.Stuck {
+		Elevator.Behaviour = def.Moving
 	}
-
-	//driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
 
 	Elevator.Floor = newFloor
 	driver.SetFloorIndicator(newFloor)
@@ -162,12 +159,12 @@ func SetAllLights() {
 
 func SetLight(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
-		if bStatus := ordermanager.GetLocalOrderMatrix().HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalID).HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}
 	} else {
-		if bStatus := ordermanager.GetLocalOrderMatrix().HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalID).HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}
