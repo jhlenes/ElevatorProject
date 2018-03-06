@@ -50,7 +50,14 @@ func onWatchdogTimeout() {
 	case def.Idle:
 		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 		if Elevator.Dir == driver.MD_Stop {
-			completeOrdersOnCurrentFloor()
+			if ordermanager.GetOrders(def.LocalID).HasOrderOnFloor(Elevator.Floor) {
+				driver.SetDoorOpenLamp(true)
+				Elevator.Behaviour = def.DoorOpen
+				resetDoorTimer()
+				scheduler.ClearOrders(Elevator.Floor, driver.MD_Up)
+				scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
+				SetAllLights()
+			}
 		} else {
 			Elevator.Behaviour = def.Moving
 			driver.SetMotorDirection(Elevator.Dir)
@@ -59,9 +66,8 @@ func onWatchdogTimeout() {
 		// TODO: Figure out if this can happen and what to do
 	case def.Moving: // Elevator is stuck
 		// TODO: Figure out what to do here
-		// try to restart motor
-		//driver.SetMotorDirection(Elevator.Dir)
-		// broadcast stuck status? let other elevators take its orders
+		Elevator.Behaviour = def.Stuck
+		scheduler.RemoveCosts()
 	}
 }
 
@@ -79,27 +85,5 @@ func watchdogTimer(resetCh chan bool) {
 		case <-timer.C:
 			onWatchdogTimeout()
 		}
-	}
-}
-
-func completeOrdersOnCurrentFloor() {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
-	if orderMatrix.HasOrder(Elevator.Floor, driver.BT_HallUp) {
-		Elevator.Dir = driver.MD_Up
-		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
-		driver.SetDoorOpenLamp(true)
-		Elevator.Behaviour = def.DoorOpen
-		resetDoorTimer()
-	} else if orderMatrix.HasOrder(Elevator.Floor, driver.BT_HallDown) {
-		Elevator.Dir = driver.MD_Down
-		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
-		driver.SetDoorOpenLamp(true)
-		Elevator.Behaviour = def.DoorOpen
-		resetDoorTimer()
-	} else if orderMatrix.HasOrder(Elevator.Floor, driver.BT_Cab) {
-		scheduler.ClearOrders(Elevator.Floor, driver.MD_Stop)
-		driver.SetDoorOpenLamp(true)
-		Elevator.Behaviour = def.DoorOpen
-		resetDoorTimer()
 	}
 }

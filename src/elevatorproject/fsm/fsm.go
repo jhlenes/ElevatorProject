@@ -3,7 +3,7 @@ package fsm
 import (
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
-	"elevatorproject/ordermanager"
+	om "elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
 	"fmt"
 )
@@ -48,6 +48,7 @@ func listenForDriverEvents() {
 		select {
 		case button := <-drvButtons:
 			if Elevator.Behaviour != def.Initializing {
+				def.Info.Printf("%+v\n", button)
 				go onButtonPress(button)
 			}
 
@@ -81,8 +82,11 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 			scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
 		} else {
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-			driver.SetMotorDirection(Elevator.Dir)
-			Elevator.Behaviour = def.Moving
+			if Elevator.Dir != driver.MD_Stop {
+				driver.SetMotorDirection(Elevator.Dir)
+				Elevator.Behaviour = def.Moving
+				resetWatchdogTimer()
+			}
 		}
 	}
 
@@ -102,7 +106,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
 			orderCompleted = true
-		} else if buttonEvent.Button == driver.BT_Cab {
+		} else if buttonEvent.Button == driver.BT_Cab && Elevator.Behaviour != def.Stuck {
 
 			// We can start a cab order without confirmation from other elevators
 			scheduler.AddOrder(Elevator, buttonEvent.Floor, buttonEvent.Button)
@@ -110,6 +114,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			driver.SetMotorDirection(Elevator.Dir)
 			Elevator.Behaviour = def.Moving
 			orderCompleted = true
+			resetWatchdogTimer()
 		}
 	}
 
@@ -129,19 +134,29 @@ func onFloorArrival(newFloor int) {
 		Elevator.Behaviour = def.Idle
 		Elevator.Dir = driver.MD_Stop
 		driver.SetMotorDirection(Elevator.Dir)
+	} else if Elevator.Behaviour == def.Stuck {
+		Elevator.Behaviour = def.Moving
+		scheduler.AddCosts(Elevator)
 	}
-
-	//driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is
 
 	Elevator.Floor = newFloor
 	driver.SetFloorIndicator(newFloor)
 	if scheduler.ShouldStop(Elevator.Floor, Elevator.Dir) {
-		driver.SetMotorDirection(driver.MD_Stop)
-		driver.SetDoorOpenLamp(true)
-		scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
-		Elevator.Behaviour = def.DoorOpen
-		resetDoorTimer()
-		SetAllLights()
+
+		if scheduler.ShouldOpenDoor(newFloor) {
+			driver.SetMotorDirection(driver.MD_Stop)
+			driver.SetDoorOpenLamp(true)
+			scheduler.ClearOrders(Elevator.Floor, Elevator.Dir)
+			Elevator.Behaviour = def.DoorOpen
+			resetDoorTimer()
+			SetAllLights()
+		} else {
+			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
+			driver.SetMotorDirection(Elevator.Dir)
+			if Elevator.Dir == driver.MD_Stop {
+				Elevator.Behaviour = def.Idle
+			}
+		}
 	}
 }
 
@@ -155,12 +170,12 @@ func SetAllLights() {
 
 func SetLight(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
-		if bStatus := ordermanager.GetLocalOrderMatrix().HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalID).HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}
 	} else {
-		if bStatus := ordermanager.GetLocalOrderMatrix().HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalID).HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}

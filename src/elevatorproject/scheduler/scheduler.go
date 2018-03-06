@@ -7,25 +7,29 @@ import (
 )
 
 func ShouldStop(floor int, dir driver.MotorDirection) bool {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetOrders(def.LocalID)
 	return shouldStop(floor, dir, orderMatrix)
 }
 
+func ShouldOpenDoor(floor int) bool {
+	return ordermanager.GetOrders(def.LocalID).HasOrderOnFloor(floor)
+}
+
 func ClearOrders(floor int, dir driver.MotorDirection) {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetOrders(def.LocalID)
 	clearOrders(floor, dir, orderMatrix)
 }
 
 func ChooseDirection(floor int, dir driver.MotorDirection) driver.MotorDirection {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetOrders(def.LocalID)
 	return chooseDirection(floor, dir, orderMatrix)
 }
 
 func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
-	orderMatrix := ordermanager.GetLocalOrderMatrix()
+	orderMatrix := ordermanager.GetOrders(def.LocalID)
 	if !ordermanager.ButtonPressed(floor, button) {
 		if button != driver.BT_Cab {
-			cost := timeToIdle(elevator, *orderMatrix, floor, button)
+			cost := timeToIdle(elevator, orderMatrix, floor, button)
 			orderMatrix.AddOrder(floor, button, cost)
 		} else {
 			orderMatrix.AddCabOrder(floor, def.LocalID)
@@ -33,17 +37,32 @@ func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
 	}
 }
 
-func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor int, button driver.ButtonType) int {
+func AddOrderWithOwner(elevator def.Elevator, floor int, button driver.ButtonType, owner int) {
+	AddOrder(elevator, floor, button)
+	ordermanager.GetOrders(def.LocalID).SetOwner(floor, button, owner)
+}
+
+func timeToIdle(elev def.Elevator, orders ordermanager.Orders, floor int, button driver.ButtonType) int {
+
+	if elev.Behaviour == def.Stuck {
+		return -1
+	}
+
+	// make a copy
+	var ordersCopy ordermanager.Orders
+	orderMatrixValue := *orders.(*ordermanager.OrderMatrix) // cast to *OrderMatrix and then get the OrderMatrix
+	ordersCopy = &orderMatrixValue
+
 	// add order to local copy of orderMatrix
-	orderMatrix[floor][button].Status = 1
-	orderMatrix[floor][button].Owner = def.LocalID
+	ordersCopy.SetStatus(floor, button, ordermanager.OS_Existing)
+	ordersCopy.SetOwner(floor, button, def.LocalID)
 
 	arrivedAtRequest := false
 	duration := 0
 
 	switch elev.Behaviour {
 	case def.Idle:
-		elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
+		elev.Dir = chooseDirection(elev.Floor, elev.Dir, ordersCopy)
 		if elev.Dir == driver.MD_Stop {
 			return duration*10 + def.LocalID
 		}
@@ -51,28 +70,28 @@ func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor i
 		duration += def.TRAVEL_TIME / 2
 		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
-		duration -= def.DoorTimeout / 2
-		elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
+		duration += def.DoorTimeout / 2
+		elev.Dir = chooseDirection(elev.Floor, elev.Dir, ordersCopy)
 	}
 
 	for {
-		if shouldStop(elev.Floor, elev.Dir, &orderMatrix) {
-			clearOrders(elev.Floor, elev.Dir, &orderMatrix)
-			duration += def.DoorTimeout
-			arrivedAtRequest = !orderMatrix.HasOrder(floor, button)
+		if shouldStop(elev.Floor, elev.Dir, ordersCopy) {
+			clearOrders(elev.Floor, elev.Dir, ordersCopy)
+			arrivedAtRequest = !ordersCopy.HasOrder(floor, button)
 			if arrivedAtRequest {
 				return duration*10 + def.LocalID
 			}
-			elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
+			duration += def.DoorTimeout
+			elev.Dir = chooseDirection(elev.Floor, elev.Dir, ordersCopy)
 		} else if elev.Dir == driver.MD_Stop {
-			if orderMatrix.HasOrder(elev.Floor, driver.BT_HallUp) {
+			if ordersCopy.HasOrder(elev.Floor, driver.BT_HallUp) {
 				elev.Dir = driver.MD_Up
-				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
-			} else if orderMatrix.HasOrder(elev.Floor, driver.BT_HallDown) {
+				clearOrders(elev.Floor, elev.Dir, ordersCopy)
+			} else if ordersCopy.HasOrder(elev.Floor, driver.BT_HallDown) {
 				elev.Dir = driver.MD_Down
-				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
-			} else if orderMatrix.HasOrder(elev.Floor, driver.BT_Cab) {
-				clearOrders(elev.Floor, elev.Dir, &orderMatrix)
+				clearOrders(elev.Floor, elev.Dir, ordersCopy)
+			} else if ordersCopy.HasOrder(elev.Floor, driver.BT_Cab) {
+				clearOrders(elev.Floor, elev.Dir, ordersCopy)
 			}
 		}
 
@@ -81,7 +100,27 @@ func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor i
 	}
 }
 
-func shouldStop(floor int, dir driver.MotorDirection, orderMatrix *ordermanager.OrderMatrix) bool {
+func AddCosts(elev def.Elevator) {
+	orders := ordermanager.GetOrders(def.LocalID)
+	for floor := 0; floor < def.FloorCount; floor++ {
+		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
+			if ordermanager.ButtonPressed(floor, button) {
+				orders.SetCost(floor, button, timeToIdle(elev, orders, floor, button))
+			}
+		}
+	}
+}
+
+func RemoveCosts() {
+	orders := ordermanager.GetOrders(def.LocalID)
+	for floor := 0; floor < def.FloorCount; floor++ {
+		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
+			orders.SetCost(floor, button, -1)
+		}
+	}
+}
+
+func shouldStop(floor int, dir driver.MotorDirection, orderMatrix ordermanager.Orders) bool {
 	switch dir {
 	case driver.MD_Down:
 		return orderMatrix.HasOrder(floor, driver.BT_Cab) ||
@@ -95,7 +134,7 @@ func shouldStop(floor int, dir driver.MotorDirection, orderMatrix *ordermanager.
 	return false
 }
 
-func clearOrders(floor int, dir driver.MotorDirection, orderMatrix *ordermanager.OrderMatrix) {
+func clearOrders(floor int, dir driver.MotorDirection, orderMatrix ordermanager.Orders) {
 	orderMatrix.UpdateOrder(floor, driver.BT_Cab)
 	switch dir {
 	case driver.MD_Down:
@@ -111,7 +150,7 @@ func clearOrders(floor int, dir driver.MotorDirection, orderMatrix *ordermanager
 	}
 }
 
-func chooseDirection(floor int, dir driver.MotorDirection, orderMatrix *ordermanager.OrderMatrix) driver.MotorDirection {
+func chooseDirection(floor int, dir driver.MotorDirection, orderMatrix ordermanager.Orders) driver.MotorDirection {
 	switch dir {
 	case driver.MD_Up:
 		if orderMatrix.HasOrderAbove(floor) {
