@@ -47,7 +47,7 @@ func listenForDriverEvents() {
 	for {
 		select {
 		case button := <-drvButtons:
-			if Elevator.Behaviour != def.Initializing {
+			if Elevator.Behaviour != def.Initializing && Elevator.Behaviour != def.Stuck {
 				go onButtonPress(button)
 			}
 
@@ -81,8 +81,11 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 			scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
 		} else {
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-			driver.SetMotorDirection(Elevator.Dir)
-			Elevator.Behaviour = def.Moving
+			if Elevator.Dir != driver.MD_Stop {
+				driver.SetMotorDirection(Elevator.Dir)
+				Elevator.Behaviour = def.Moving
+				resetWatchdogTimer()
+			}
 		}
 	}
 
@@ -110,6 +113,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			driver.SetMotorDirection(Elevator.Dir)
 			Elevator.Behaviour = def.Moving
 			orderCompleted = true
+			resetWatchdogTimer()
 		}
 	}
 
@@ -125,10 +129,13 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 func onFloorArrival(newFloor int) {
 	resetWatchdogTimer()
 
-	if Elevator.Behaviour == def.Initializing {
+	if Elevator.Behaviour == def.Initializing || Elevator.Behaviour == def.Stuck {
 		Elevator.Behaviour = def.Idle
 		Elevator.Dir = driver.MD_Stop
 		driver.SetMotorDirection(Elevator.Dir)
+		if Elevator.Behaviour == def.Stuck {
+			completeOrdersOnCurrentFloor()
+		}
 	}
 
 	//driver.SetMotorDirection(Elevator.Dir) // make sure elevator is going the way is says it is

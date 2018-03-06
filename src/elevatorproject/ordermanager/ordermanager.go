@@ -32,7 +32,7 @@ func init() {
 	m := OrderMatrix{}
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
-			m[f][b] = createEmptyOrder()
+			m[f][b] = CreateEmptyOrder()
 		}
 	}
 	for elevId := 0; elevId < def.ElevatorCount; elevId++ {
@@ -46,15 +46,6 @@ func GetLocalOrderMatrix() *OrderMatrix {
 
 func ButtonPressed(floor int, button driver.ButtonType) bool {
 	return OrderMatrices[def.LocalID][floor][button].Status != 0
-}
-
-func HasSystemOrder(floor int, button driver.ButtonType, ids []int) bool {
-	for _, id := range ids {
-		if OrderMatrices[id][floor][button].Status != 1 {
-			return false
-		}
-	}
-	return true
 }
 
 func (m *OrderMatrix) HasOrder(floor int, button driver.ButtonType) bool {
@@ -88,13 +79,13 @@ func (m *OrderMatrix) HasOrderBelow(floor int) bool {
 }
 
 func (m *OrderMatrix) RemoveOrder(floor int, button driver.ButtonType) {
-	m[floor][button] = createEmptyOrder()
+	m[floor][button] = CreateEmptyOrder()
 }
 
 func (m *OrderMatrix) UpdateOrder(floor int, button driver.ButtonType) {
 	if m[floor][button].Status == 1 {
 		if button == driver.BT_Cab {
-			m[floor][button] = createEmptyOrder()
+			m[floor][button] = CreateEmptyOrder()
 		} else {
 			m[floor][button].Status = 2
 		}
@@ -119,7 +110,7 @@ func AddMatrix(id int, newMatrix OrderMatrix) {
 	OrderMatrices[id] = newMatrix
 }
 
-func createEmptyOrder() order {
+func CreateEmptyOrder() order {
 	return order{0, -1, -1}
 }
 

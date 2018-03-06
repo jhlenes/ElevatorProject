@@ -59,9 +59,7 @@ func onWatchdogTimeout() {
 		// TODO: Figure out if this can happen and what to do
 	case def.Moving: // Elevator is stuck
 		// TODO: Figure out what to do here
-		// try to restart motor
-		//driver.SetMotorDirection(Elevator.Dir)
-		// broadcast stuck status? let other elevators take its orders
+		Elevator.Behaviour = def.Stuck
 	}
 }
 
@@ -102,4 +100,5 @@ func completeOrdersOnCurrentFloor() {
 		Elevator.Behaviour = def.DoorOpen
 		resetDoorTimer()
 	}
+	SetAllLights()
 }

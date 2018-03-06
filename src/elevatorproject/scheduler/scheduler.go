@@ -34,6 +34,9 @@ func AddOrder(elevator def.Elevator, floor int, button driver.ButtonType) {
 }
 
 func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor int, button driver.ButtonType) int {
+	if elev.Behaviour == def.Stuck {
+		return 999999*10 + def.LocalID
+	}
 	// add order to local copy of orderMatrix
 	orderMatrix[floor][button].Status = 1
 	orderMatrix[floor][button].Owner = def.LocalID
@@ -51,18 +54,18 @@ func timeToIdle(elev def.Elevator, orderMatrix ordermanager.OrderMatrix, floor i
 		duration += def.TRAVEL_TIME / 2
 		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
-		duration -= def.DoorTimeout / 2
+		duration += def.DoorTimeout / 2
 		elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
 	}
 
 	for {
 		if shouldStop(elev.Floor, elev.Dir, &orderMatrix) {
 			clearOrders(elev.Floor, elev.Dir, &orderMatrix)
-			duration += def.DoorTimeout
 			arrivedAtRequest = !orderMatrix.HasOrder(floor, button)
 			if arrivedAtRequest {
 				return duration*10 + def.LocalID
 			}
+			duration += def.DoorTimeout
 			elev.Dir = chooseDirection(elev.Floor, elev.Dir, &orderMatrix)
 		} else if elev.Dir == driver.MD_Stop {
 			if orderMatrix.HasOrder(elev.Floor, driver.BT_HallUp) {

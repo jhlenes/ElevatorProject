@@ -6,29 +6,45 @@ import (
 	"elevatorproject/fsm"
 	om "elevatorproject/ordermanager"
 	"elevatorproject/scheduler"
-	"log"
-	"strconv"
 )
 
-func getIdsFromPeers(peers []string) []int {
-	ids := []int{}
-	for _, peer := range peers {
-		id, err := strconv.Atoi(peer)
-		if err != nil {
-			log.Println("Id of a peer is not an integer.")
-		} else {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
-func Synchronize(peers []string, new string, lost []string) {
-	ids := getIdsFromPeers(peers)
+func ReassignOrders(ids []int, id int) {
+	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
 
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 			if b == driver.BT_Cab {
+				continue
+			}
+
+			// Reassign orders owned by <id> to the elevator with the lowest cost
+			if om.OrderMatrices[def.LocalID][f][b].Owner == id {
+				if cost, bestId := getCost(ids, f, b); cost >= 0 {
+					copyOrder(bestId, f, b)
+					if bestId == def.LocalID {
+						fsm.OnNewOrder(f, b)
+					}
+				} else { // couldn't find a new owner
+					addOrder(f, b) // TODO: correct?
+				}
+			}
+
+			// TODO: Should also take order in some cases if communication was lost during confirmation
+
+			om.OrderMatrices[id][f][b] = om.CreateEmptyOrder()
+		}
+	}
+}
+
+func Synchronize(ids []int) {
+	for f := 0; f < def.FloorCount; f++ {
+		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
+			if b == driver.BT_Cab {
+				continue
+			}
+			if fsm.Elevator.Behaviour == def.Stuck {
+				om.OrderMatrices[def.LocalID][f][b] = om.OrderMatrices[ids[0]][f][b]
+				fsm.SetLight(f, b)
 				continue
 			}
 
@@ -53,11 +69,9 @@ func Synchronize(peers []string, new string, lost []string) {
 				} else if anyExisting(ids, f, b) {
 					if owner := getOwner(ids, f, b); owner >= 0 {
 						copyOrder(owner, f, b)
-					} else if lowestCost := getCost(ids, f, b); lowestCost >= 0 {
-						if getCost([]int{def.LocalID}, f, b) == lowestCost {
-							setOwner(def.LocalID, f, b)
-							fsm.OnNewOrder(f, b)
-						}
+					} else if _, bestId := getCost(ids, f, b); allExisting(ids, f, b) && bestId == def.LocalID {
+						setOwner(def.LocalID, f, b)
+						fsm.OnNewOrder(f, b)
 					}
 				}
 			case om.OS_Completed:
@@ -67,7 +81,6 @@ func Synchronize(peers []string, new string, lost []string) {
 			case om.OS_Removing:
 				if !anyExisting(ids, f, b) && !anyCompleted(ids, f, b) {
 					setStatus(om.OS_Empty, f, b)
-
 				}
 			}
 		}
@@ -100,6 +113,15 @@ func anyExisting(ids []int, floor int, button driver.ButtonType) bool {
 		}
 	}
 	return false
+}
+
+func allExisting(ids []int, floor int, button driver.ButtonType) bool {
+	for _, id := range ids {
+		if om.OrderMatrices[id][floor][button].Status != om.OS_Existing {
+			return false
+		}
+	}
+	return true
 }
 
 func anyEmpty(ids []int, floor int, button driver.ButtonType) bool {
@@ -146,12 +168,18 @@ func setOwner(id int, f int, b driver.ButtonType) {
 	fsm.SetAllLights()
 }
 
-func getCost(ids []int, f int, b driver.ButtonType) int {
+// getCost gets the lowest cost of the available ids, or -1 if no elevator has registered its cost
+func getCost(ids []int, f int, b driver.ButtonType) (cost int, id int) {
+	bestId := ids[0]
 	lowestCost := om.OrderMatrices[ids[0]][f][b].Cost
 	for _, id := range ids {
-		if om.OrderMatrices[id][f][b].Cost < lowestCost {
+		if lowestCost < 0 {
 			lowestCost = om.OrderMatrices[id][f][b].Cost
+			bestId = id
+		} else if cost := om.OrderMatrices[id][f][b].Cost; cost >= 0 && cost < lowestCost {
+			lowestCost = om.OrderMatrices[id][f][b].Cost
+			bestId = id
 		}
 	}
-	return lowestCost
+	return lowestCost, bestId
 }
