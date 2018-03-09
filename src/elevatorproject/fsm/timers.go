@@ -48,19 +48,19 @@ func onWatchdogTimeout() {
 
 	switch Elevator.Behaviour {
 	case def.Idle:
-		Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
-		if Elevator.Dir == driver.MD_Stop {
-			if ordermanager.GetOrders(def.LocalID).HasOrderOnFloor(Elevator.Floor) {
-				driver.SetDoorOpenLamp(true)
-				Elevator.Behaviour = def.DoorOpen
-				resetDoorTimer()
-				scheduler.ClearOrders(Elevator.Floor, driver.MD_Up)
-				scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
-				SetAllLights()
-			}
+		if ordermanager.GetOrders(def.LocalID).HasOrderOnFloor(Elevator.Floor) {
+			driver.SetDoorOpenLamp(true)
+			Elevator.Behaviour = def.DoorOpen
+			resetDoorTimer()
+			scheduler.ClearOrders(Elevator.Floor, driver.MD_Up)
+			scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
+			SetAllLights()
 		} else {
-			Elevator.Behaviour = def.Moving
-			driver.SetMotorDirection(Elevator.Dir)
+			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
+			if Elevator.Dir != driver.MD_Stop {
+				Elevator.Behaviour = def.Moving
+				driver.SetMotorDirection(Elevator.Dir)
+			}
 		}
 	case def.DoorOpen:
 		// TODO: Figure out if this can happen and what to do

@@ -16,6 +16,7 @@ func Init() {
 	// Initialize driver
 	elevatorAddr := fmt.Sprintf("%s:%d", def.Addr, def.Port)
 	driver.Init(elevatorAddr, def.FloorCount)
+	om.ReadBackup()
 
 	Elevator.Floor = -1
 	Elevator.Dir = driver.MD_Up
@@ -30,6 +31,7 @@ func Init() {
 		}
 	}
 	driver.SetDoorOpenLamp(false)
+	SetAllLights()
 
 	go doorTimer(doorTimerResetCh)
 	go watchdogTimer(watchdogTimerResetCh)

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	def "elevatorproject/definitions"
 	"elevatorproject/driver"
+	"encoding/json"
 	"fmt"
+	"os"
 )
 
 type OrderStatus int
@@ -147,6 +149,7 @@ func (m *OrderMatrix) RemoveOrder(floor int, button driver.ButtonType) {
 func (m *OrderMatrix) UpdateOrder(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
 		m[floor][button] = CreateEmptyOrder()
+		backupCabOrders()
 	} else {
 		m[floor][button].Status = 2
 	}
@@ -160,6 +163,7 @@ func (m *OrderMatrix) AddOrder(floor int, button driver.ButtonType, cost int) {
 func (m *OrderMatrix) AddCabOrder(floor int, owner int) {
 	m[floor][driver.BT_Cab].Status = 1
 	m[floor][driver.BT_Cab].Owner = owner
+	backupCabOrders()
 }
 
 func AddMatrix(id int, newMatrix OrderMatrix) {
@@ -182,4 +186,35 @@ func PrintOrder(orders OrderMatrix) {
 		buffer.WriteString("\n")
 	}
 	fmt.Println(buffer.String())
+}
+
+func backupCabOrders() {
+	fileName := fmt.Sprintf("%v_backup.dat", def.LocalID)
+	os.Remove(fileName)
+	f, _ := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0755)
+	b, _ := json.Marshal(orderMatrices[def.LocalID])
+	f.Write(b)
+	f.Close()
+}
+
+func ReadBackup() {
+	fileName := fmt.Sprintf("%v_backup.dat", def.LocalID)
+	f, _ := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0755)
+	b := make([]byte, 2048)
+	n, _ := f.Read(b)
+	m := OrderMatrix{}
+	err := json.Unmarshal(b[:n], &m)
+	if err != nil {
+		fmt.Println(err)
+	}
+	f.Close()
+
+	def.Info.Println("Backup loaded!")
+	PrintOrder(m)
+
+	for f := 0; f < def.FloorCount; f++ {
+		if m[f][driver.BT_Cab].Status == 1 {
+			orderMatrices[def.LocalID][f][driver.BT_Cab] = m[f][driver.BT_Cab]
+		}
+	}
 }
