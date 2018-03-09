@@ -5,7 +5,7 @@ import (
 	"elevatorproject/driver"
 	"elevatorproject/fsm"
 	"elevatorproject/network"
-	//om "elevatorproject/ordermanager"
+	om "elevatorproject/ordermanager"
 	"flag"
 	"fmt"
 	"log"
@@ -33,12 +33,12 @@ func main() {
 	fsm.Init()
 	network.Init()
 
-	/*go func() {
+	go func() {
 		for {
 			time.Sleep(2 * time.Second)
 			om.PrintOrder(*om.GetOrders(def.LocalID).(*om.OrderMatrix))
 		}
-	}()*/
+	}()
 
 	//go printNumGoroutines()
 	go printGoroutineStackTracesOnSigquit()

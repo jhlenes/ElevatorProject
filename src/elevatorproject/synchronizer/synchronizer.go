@@ -8,6 +8,16 @@ import (
 	"elevatorproject/scheduler"
 )
 
+func StartOperatingAlone() {
+	for f := 0; f < def.FloorCount; f++ {
+		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
+			if status := om.GetOrders(def.LocalID).GetStatus(f, b); status == om.OS_Completed || status == om.OS_Removing {
+				om.GetOrders(def.LocalID).RemoveOrder(f, b)
+			}
+		}
+	}
+}
+
 func ReassignOrders(ids []int, id int) {
 	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
 
@@ -27,6 +37,16 @@ func ReassignOrders(ids []int, id int) {
 			}
 
 			// TODO: Should also take order in some cases if communication was lost during confirmation
+			if om.GetOrders(def.LocalID).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty {
+				if om.GetOrders(def.LocalID).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 {
+					if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
+						addOrderWithOwner(f, b, bestId)
+					} else {
+						takeOrder(f, b)
+					}
+				}
+			}
+
 		}
 	}
 }

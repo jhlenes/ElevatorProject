@@ -8,6 +8,7 @@ import (
 	"fmt"
 )
 
+var NumOnlineElevators = 0
 var Elevator def.Elevator
 var buttonStatus [def.FloorCount][def.ButtonCount]bool
 
@@ -116,6 +117,10 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			orderCompleted = true
 			resetWatchdogTimer()
 		}
+	}
+
+	if NumOnlineElevators < 2 && buttonEvent.Button != driver.BT_Cab { // Ignore some button presses when only 1 elevator
+		return
 	}
 
 	if !orderCompleted {

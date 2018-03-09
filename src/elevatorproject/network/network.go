@@ -17,6 +17,8 @@ type ordersMsg struct {
 }
 
 var elevatorTimers [def.ElevatorCount]*time.Timer
+var onlineElevators = make(map[int]bool)
+var activeElevators = make(map[int]bool)
 
 func Init() {
 
@@ -43,8 +45,6 @@ func Init() {
 }
 
 func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
-	onlineElevators := make(map[int]bool)
-	activeElevators := make(map[int]bool)
 	for {
 		select {
 		case msg := <-ordersRx:
@@ -55,11 +55,13 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 				}
 				if _, ok := activeElevators[msg.ID]; msg.Stuck && ok {
 					delete(activeElevators, msg.ID)
+					fsm.NumOnlineElevators = len(activeElevators)
 					elevatorTimers[msg.ID].Stop()
 					def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
 					synchronizer.ReassignOrders(getIds(activeElevators), msg.ID)
 				} else if !msg.Stuck && !ok {
 					activeElevators[msg.ID] = true
+					fsm.NumOnlineElevators = len(activeElevators)
 					def.Info.Printf("Elevator no longer stuck: %v\n", msg.ID)
 				}
 
@@ -72,8 +74,14 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 		case lostId := <-elevatorTimeoutCh:
 			delete(onlineElevators, lostId)
 			delete(activeElevators, lostId)
+			fsm.NumOnlineElevators = len(activeElevators)
 			def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 			elevatorTimers[lostId].Stop()
+
+			if len(onlineElevators) < 2 {
+				synchronizer.StartOperatingAlone()
+			}
+
 			if fsm.Elevator.Behaviour != def.Initializing {
 				synchronizer.ReassignOrders(getIds(activeElevators), lostId)
 			}
@@ -84,8 +92,12 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 func sendMessages(ordersTx chan ordersMsg) {
 	for {
 		time.Sleep(def.SendTime * time.Millisecond)
+		if len(onlineElevators) < 2 { // TODO: maybe move this elesewhere?
+			synchronizer.StartOperatingAlone()
+		}
 		isStuck := fsm.Elevator.Behaviour == def.Stuck
 		ordersTx <- ordersMsg{def.LocalID, isStuck, *ordermanager.GetOrders(def.LocalID).(*ordermanager.OrderMatrix)}
+
 	}
 }
 
