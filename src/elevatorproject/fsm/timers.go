@@ -14,6 +14,10 @@ var watchdogTimerResetCh chan bool = make(chan bool, 10)
 
 func onDoorTimeout() {
 	resetWatchdogTimer()
+	if (Elevator.Stuck) {
+		Elevator.Stuck = false
+		scheduler.AddCosts(Elevator)
+	}
 
 	Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)
 	driver.SetDoorOpenLamp(false)
@@ -26,7 +30,6 @@ func onDoorTimeout() {
 }
 
 func resetDoorTimer() {
-	resetWatchdogTimer()
 	doorTimerResetCh <- true
 }
 
@@ -44,6 +47,7 @@ func doorTimer(resetCh chan bool) {
 }
 
 func onWatchdogTimeout() {
+	def.Info.Println("watchdog")
 	resetWatchdogTimer()
 
 	switch Elevator.Behaviour {
@@ -60,13 +64,25 @@ func onWatchdogTimeout() {
 			if Elevator.Dir != driver.MD_Stop {
 				Elevator.Behaviour = def.Moving
 				driver.SetMotorDirection(Elevator.Dir)
+			} else {
+				if Elevator.Stuck {
+					Elevator.Behaviour = def.Moving
+					if Elevator.Floor == 0 {
+						Elevator.Dir = driver.MD_Up
+					} else {
+						Elevator.Dir = driver.MD_Down
+					}
+					driver.SetMotorDirection(Elevator.Dir)
+				}
 			}
 		}
 	case def.DoorOpen:
 		// TODO: Figure out if this can happen and what to do
+		Elevator.Stuck = true
+		scheduler.RemoveCosts()
 	case def.Moving: // Elevator is stuck
 		// TODO: Figure out what to do here
-		Elevator.Behaviour = def.Stuck
+		Elevator.Stuck = true
 		scheduler.RemoveCosts()
 	}
 }

@@ -57,6 +57,7 @@ func listenForDriverEvents() {
 			}
 
 		case floor := <-drvFloors:
+			def.Info.Printf("%+v\n", floor)
 			go onFloorArrival(floor)
 		}
 	}
@@ -139,8 +140,8 @@ func onFloorArrival(newFloor int) {
 		Elevator.Behaviour = def.Idle
 		Elevator.Dir = driver.MD_Stop
 		driver.SetMotorDirection(Elevator.Dir)
-	} else if Elevator.Behaviour == def.Stuck {
-		Elevator.Behaviour = def.Moving
+	} else if Elevator.Stuck {
+		Elevator.Stuck = false
 		scheduler.AddCosts(Elevator)
 	}
 

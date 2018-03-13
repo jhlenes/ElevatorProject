@@ -43,7 +43,7 @@ func AddOrderWithOwner(elevator def.Elevator, floor int, button driver.ButtonTyp
 }
 
 func timeToIdle(elev def.Elevator, orders om.Orders, floor int, button driver.ButtonType) int {
-	if elev.Behaviour == def.Stuck {
+	if elev.Stuck {
 		return -1
 	}
 

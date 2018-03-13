@@ -32,7 +32,6 @@ const (
 	DoorOpen
 	Moving
 	Initializing
-	Stuck
 )
 
 type Elevator struct {
@@ -40,4 +39,5 @@ type Elevator struct {
 	Dir       driver.MotorDirection
 	Behaviour ElevatorBehaviour
 	ID        int
+	Stuck 	  bool
 }

@@ -81,7 +81,7 @@ func sendMessages(ordersTx chan ordersMsg) {
 		if len(onlineElevators) < 2 { // TODO: maybe move this elesewhere?
 			synchronizer.StartOperatingAlone()
 		}
-		isStuck := fsm.Elevator.Behaviour == def.Stuck
+		isStuck := fsm.Elevator.Stuck
 		ordersTx <- ordersMsg{def.LocalId, isStuck, *ordermanager.GetOrders(def.LocalId).(*ordermanager.OrderMatrix)}
 
 	}

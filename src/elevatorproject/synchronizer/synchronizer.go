@@ -19,6 +19,9 @@ func StartOperatingAlone() {
 }
 
 func ReassignOrders(ids []int, id int) {
+	if len(ids) == 0 {
+		return
+	}
 	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
 
 	for f := 0; f < def.FloorCount; f++ {
@@ -52,6 +55,9 @@ func ReassignOrders(ids []int, id int) {
 }
 
 func Synchronize(onlineIds, activeIds []int) {
+	if len(onlineIds) == 0 {
+		return
+	}
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 			if b == driver.BT_Cab {
