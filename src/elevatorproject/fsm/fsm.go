@@ -8,12 +8,13 @@ import (
 	"fmt"
 )
 
-var NumOnlineElevators = 0
+var NumActiveElevators = 1
 var Elevator def.Elevator
 var buttonStatus [def.FloorCount][def.ButtonCount]bool
 
 func Init() {
-	// Initialize driver
+
+	// Initialize dependencies
 	elevatorAddr := fmt.Sprintf("%s:%d", def.Addr, def.Port)
 	driver.Init(elevatorAddr, def.FloorCount)
 	om.ReadBackup()
@@ -22,7 +23,7 @@ func Init() {
 	Elevator.Dir = driver.MD_Up
 	driver.SetMotorDirection(driver.MD_Up)
 	Elevator.Behaviour = def.Initializing
-	Elevator.ID = def.LocalID
+	Elevator.ID = def.LocalId
 
 	// Reset all lights
 	for floor := 0; floor < def.FloorCount; floor++ {
@@ -65,15 +66,12 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 	switch Elevator.Behaviour {
 	case def.DoorOpen: // if door is open, at correct floor and going in button direction => clear order
 		if Elevator.Floor == floor {
-			if button == driver.BT_HallUp && Elevator.Dir == driver.MD_Up {
+			if button == driver.BT_HallUp && Elevator.Dir != driver.MD_Down {
 				resetDoorTimer()
 				scheduler.ClearOrders(floor, driver.MD_Up)
-			} else if button == driver.BT_HallDown && Elevator.Dir == driver.MD_Down {
+			} else if button == driver.BT_HallDown && Elevator.Dir != driver.MD_Up {
 				resetDoorTimer()
 				scheduler.ClearOrders(floor, driver.MD_Down)
-			} else if button == driver.BT_Cab {
-				resetDoorTimer()
-				scheduler.ClearOrders(floor, driver.MD_Stop)
 			}
 		}
 	case def.Idle:
@@ -109,7 +107,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
 			orderCompleted = true
-		} else if buttonEvent.Button == driver.BT_Cab && Elevator.Behaviour != def.Stuck {
+		} else if buttonEvent.Button == driver.BT_Cab {
 
 			// We can start a cab order without confirmation from other elevators
 			scheduler.AddOrder(Elevator, buttonEvent.Floor, buttonEvent.Button)
@@ -121,7 +119,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 		}
 	}
 
-	if NumOnlineElevators < 2 && buttonEvent.Button != driver.BT_Cab { // Ignore some button presses when only 1 elevator
+	if NumActiveElevators < 2 && buttonEvent.Button != driver.BT_Cab { // Ignore some button presses when only 1 elevator
 		return
 	}
 
@@ -177,12 +175,12 @@ func SetAllLights() {
 
 func SetLight(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
-		if bStatus := om.GetOrders(def.LocalID).HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalId).HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}
 	} else {
-		if bStatus := om.GetOrders(def.LocalID).HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
+		if bStatus := om.GetOrders(def.LocalId).HasSystemOrder(floor, button); bStatus != buttonStatus[floor][button] {
 			driver.SetButtonLamp(button, floor, bStatus)
 			buttonStatus[floor][button] = bStatus
 		}

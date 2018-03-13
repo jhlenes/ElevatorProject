@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-var LocalID = 0
+var LocalId = 0
 var Addr = "localhost"
 var Port = 15657
 

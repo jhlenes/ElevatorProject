@@ -49,24 +49,10 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 		select {
 		case msg := <-ordersRx:
 			if fsm.Elevator.Behaviour != def.Initializing {
-				if _, ok := onlineElevators[msg.ID]; !ok { // if new id
-					onlineElevators[msg.ID] = true
-					def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
-				}
-				if _, ok := activeElevators[msg.ID]; msg.Stuck && ok {
-					delete(activeElevators, msg.ID)
-					fsm.NumOnlineElevators = len(activeElevators)
-					elevatorTimers[msg.ID].Stop()
-					def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
-					synchronizer.ReassignOrders(getIds(activeElevators), msg.ID)
-				} else if !msg.Stuck && !ok {
-					activeElevators[msg.ID] = true
-					fsm.NumOnlineElevators = len(activeElevators)
-					def.Info.Printf("Elevator no longer stuck: %v\n", msg.ID)
-				}
+				checkForNewOrStuckElevators(msg)
 
 				elevatorTimers[msg.ID].Reset(def.ElevatorTimeout * time.Second)
-				if msg.ID != def.LocalID {
+				if msg.ID != def.LocalId {
 					ordermanager.AddMatrix(msg.ID, msg.Orders)
 					synchronizer.Synchronize(getIds(onlineElevators), getIds(activeElevators))
 				}
@@ -74,7 +60,7 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 		case lostId := <-elevatorTimeoutCh:
 			delete(onlineElevators, lostId)
 			delete(activeElevators, lostId)
-			fsm.NumOnlineElevators = len(activeElevators)
+			fsm.NumActiveElevators = len(activeElevators)
 			def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 			elevatorTimers[lostId].Stop()
 
@@ -96,7 +82,7 @@ func sendMessages(ordersTx chan ordersMsg) {
 			synchronizer.StartOperatingAlone()
 		}
 		isStuck := fsm.Elevator.Behaviour == def.Stuck
-		ordersTx <- ordersMsg{def.LocalID, isStuck, *ordermanager.GetOrders(def.LocalID).(*ordermanager.OrderMatrix)}
+		ordersTx <- ordersMsg{def.LocalId, isStuck, *ordermanager.GetOrders(def.LocalId).(*ordermanager.OrderMatrix)}
 
 	}
 }
@@ -109,4 +95,24 @@ func getIds(elevatorMap map[int]bool) []int {
 		i++
 	}
 	return ids
+}
+
+func checkForNewOrStuckElevators(msg ordersMsg) {
+	if _, ok := onlineElevators[msg.ID]; !ok { // if new id
+		onlineElevators[msg.ID] = true
+		activeElevators[msg.ID] = true
+		fsm.NumActiveElevators = len(activeElevators)
+		def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
+	}
+	if _, ok := activeElevators[msg.ID]; msg.Stuck && ok { // elevator is stuck
+		delete(activeElevators, msg.ID)
+		fsm.NumActiveElevators = len(activeElevators)
+		elevatorTimers[msg.ID].Stop()
+		def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
+		synchronizer.ReassignOrders(getIds(activeElevators), msg.ID)
+	} else if !msg.Stuck && !ok { // elevator is no longer stuck
+		activeElevators[msg.ID] = true
+		fsm.NumActiveElevators = len(activeElevators)
+		def.Info.Printf("Elevator no longer stuck: %v\n", msg.ID)
+	}
 }

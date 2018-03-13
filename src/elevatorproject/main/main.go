@@ -5,7 +5,7 @@ import (
 	"elevatorproject/driver"
 	"elevatorproject/fsm"
 	"elevatorproject/network"
-	//om "elevatorproject/ordermanager"
+	om "elevatorproject/ordermanager"
 	"flag"
 	"fmt"
 	"log"
@@ -22,24 +22,18 @@ func main() {
 	var id int
 	var addr string
 	var port int
-	flag.IntVar(&id, "id", def.LocalID, "id of this peer")
+	flag.IntVar(&id, "id", def.LocalId, "id of this peer")
 	flag.StringVar(&addr, "addr", def.Addr, "address of elevator server")
 	flag.IntVar(&port, "port", def.Port, "port of elevator server")
 	flag.Parse()
-	def.LocalID = id
+	def.LocalId = id
 	def.Addr = addr
 	def.Port = port
 
 	fsm.Init()
 	network.Init()
 
-	/*go func() {
-		for {
-			time.Sleep(2 * time.Second)
-			om.PrintOrder(*om.GetOrders(def.LocalID).(*om.OrderMatrix))
-		}
-	}()*/
-
+	//go printOrderMatrices(2 * time.Second)
 	//go printNumGoroutines()
 	go printGoroutineStackTracesOnSigquit()
 	waitForShutdownSignal()
@@ -71,5 +65,12 @@ func printNumGoroutines() {
 	for {
 		fmt.Printf("#goroutines: %d\n", runtime.NumGoroutine())
 		time.Sleep(1 * time.Second)
+	}
+}
+
+func printOrderMatrices(interval time.Duration) {
+	for {
+		time.Sleep(interval)
+		om.PrintOrder(*om.GetOrders(def.LocalId).(*om.OrderMatrix))
 	}
 }

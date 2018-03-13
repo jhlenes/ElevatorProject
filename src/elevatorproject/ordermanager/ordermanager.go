@@ -43,7 +43,6 @@ type Orders interface {
 	HasOrderBelow(floor int) bool
 
 	RemoveOrder(floor int, button driver.ButtonType)
-	UpdateOrder(floor int, button driver.ButtonType)
 	AddOrder(floor int, button driver.ButtonType, cost int)
 	AddCabOrder(floor int, owner int)
 }
@@ -68,7 +67,7 @@ func GetOrders(id int) Orders {
 }
 
 func ButtonPressed(floor int, button driver.ButtonType) bool {
-	return orderMatrices[def.LocalID][floor][button].Status != 0
+	return orderMatrices[def.LocalId][floor][button].Status != 0
 }
 
 func (m *OrderMatrix) GetStatus(floor int, button driver.ButtonType) OrderStatus {
@@ -104,12 +103,12 @@ func (m *OrderMatrix) SetOrder(floor int, button driver.ButtonType, order Order)
 }
 
 func (m *OrderMatrix) HasOrder(floor int, button driver.ButtonType) bool {
-	return m[floor][button].Owner == def.LocalID && m[floor][button].Status == 1
+	return m[floor][button].Owner == def.LocalId && m[floor][button].Status == 1
 }
 
 func (m *OrderMatrix) HasOrderOnFloor(floor int) bool {
 	for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
-		if m[floor][b].Owner == def.LocalID && m[floor][b].Status == 1 {
+		if m[floor][b].Owner == def.LocalId && m[floor][b].Status == 1 {
 			return true
 		}
 	}
@@ -144,14 +143,8 @@ func (m *OrderMatrix) HasOrderBelow(floor int) bool {
 
 func (m *OrderMatrix) RemoveOrder(floor int, button driver.ButtonType) {
 	m[floor][button] = CreateEmptyOrder()
-}
-
-func (m *OrderMatrix) UpdateOrder(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
-		m[floor][button] = CreateEmptyOrder()
 		backupCabOrders()
-	} else {
-		m[floor][button].Status = 2
 	}
 }
 
@@ -189,32 +182,48 @@ func PrintOrder(orders OrderMatrix) {
 }
 
 func backupCabOrders() {
-	fileName := fmt.Sprintf("%v_backup.dat", def.LocalID)
+	fileName := fmt.Sprintf("backup_%v.dat", def.LocalId)
 	os.Remove(fileName)
-	f, _ := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0755)
-	b, _ := json.Marshal(orderMatrices[def.LocalID])
+	f, err1 := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0755)
+	if err1 != nil {
+		def.Info.Println("Could not make backup.")
+		return
+	}
+	b, err2 := json.Marshal(orderMatrices[def.LocalId])
+	if err2 != nil {
+		def.Info.Println("Could not make backup.")
+		return
+	}
 	f.Write(b)
 	f.Close()
 }
 
 func ReadBackup() {
-	fileName := fmt.Sprintf("%v_backup.dat", def.LocalID)
-	f, _ := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0755)
-	b := make([]byte, 2048)
-	n, _ := f.Read(b)
-	m := OrderMatrix{}
-	err := json.Unmarshal(b[:n], &m)
-	if err != nil {
-		fmt.Println(err)
+	fileName := fmt.Sprintf("backup_%v.dat", def.LocalId)
+	f, err1 := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0755)
+	defer f.Close()
+	if err1 != nil {
+		def.Info.Println("No backup.")
+		return
 	}
-	f.Close()
+	b := make([]byte, 2048)
+	n, err2 := f.Read(b)
+	if err2 != nil {
+		def.Info.Println("No backup.")
+		return
+	}
+	m := OrderMatrix{}
+	err3 := json.Unmarshal(b[:n], &m)
+	if err3 != nil {
+		def.Info.Println("No backup.")
+		return
+	}
 
 	def.Info.Println("Backup loaded!")
-	PrintOrder(m)
 
 	for f := 0; f < def.FloorCount; f++ {
 		if m[f][driver.BT_Cab].Status == 1 {
-			orderMatrices[def.LocalID][f][driver.BT_Cab] = m[f][driver.BT_Cab]
+			orderMatrices[def.LocalId][f][driver.BT_Cab] = m[f][driver.BT_Cab]
 		}
 	}
 }

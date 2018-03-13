@@ -11,8 +11,8 @@ import (
 func StartOperatingAlone() {
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
-			if status := om.GetOrders(def.LocalID).GetStatus(f, b); status == om.OS_Completed || status == om.OS_Removing {
-				om.GetOrders(def.LocalID).RemoveOrder(f, b)
+			if status := om.GetOrders(def.LocalId).GetStatus(f, b); status == om.OS_Completed || status == om.OS_Removing {
+				om.GetOrders(def.LocalId).RemoveOrder(f, b)
 			}
 		}
 	}
@@ -28,7 +28,7 @@ func ReassignOrders(ids []int, id int) {
 			}
 
 			// Reassign orders owned by <id> to the elevator with the lowest cost
-			if om.GetOrders(def.LocalID).GetOwner(f, b) == id {
+			if om.GetOrders(def.LocalId).GetOwner(f, b) == id {
 				if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
 					addOrderWithOwner(f, b, bestId)
 				} else { // couldn't find a new owner
@@ -37,8 +37,8 @@ func ReassignOrders(ids []int, id int) {
 			}
 
 			// TODO: Should also take order in some cases if communication was lost during confirmation
-			if om.GetOrders(def.LocalID).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty {
-				if om.GetOrders(def.LocalID).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 {
+			if om.GetOrders(def.LocalId).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty {
+				if om.GetOrders(def.LocalId).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 {
 					if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
 						addOrderWithOwner(f, b, bestId)
 					} else {
@@ -58,7 +58,7 @@ func Synchronize(onlineIds, activeIds []int) {
 				continue
 			}
 
-			switch om.GetOrders(def.LocalID).GetStatus(f, b) {
+			switch om.GetOrders(def.LocalId).GetStatus(f, b) {
 			case om.OS_Empty:
 				if anyRemoving(onlineIds, f, b) {
 					// do nothing
@@ -76,7 +76,7 @@ func Synchronize(onlineIds, activeIds []int) {
 					setStatus(om.OS_Removing, f, b)
 				} else if anyCompleted(onlineIds, f, b) {
 					setStatus(om.OS_Completed, f, b)
-				} else if anyExisting(onlineIds, f, b) && om.GetOrders(def.LocalID).GetOwner(f, b) < 0 {
+				} else if anyExisting(onlineIds, f, b) && om.GetOrders(def.LocalId).GetOwner(f, b) < 0 {
 					if owner := getOwner(onlineIds, f, b); owner >= 0 {
 						setOwner(f, b, owner)
 					} else if shouldTakeOrder(f, b, onlineIds, activeIds) {
@@ -98,7 +98,7 @@ func Synchronize(onlineIds, activeIds []int) {
 
 func shouldTakeOrder(floor int, button driver.ButtonType, onlineIds, activeIds []int) bool {
 	lowestCost, bestId := getLowestCost(onlineIds, floor, button)
-	return allExisting(onlineIds, floor, button) && bestId == def.LocalID && lowestCost >= 0 && len(activeIds) >= 2
+	return allExisting(onlineIds, floor, button) && bestId == def.LocalId && lowestCost >= 0 && len(activeIds) >= 2
 }
 
 func anyRemoving(ids []int, floor int, button driver.ButtonType) bool {
@@ -147,12 +147,10 @@ func anyEmpty(ids []int, floor int, button driver.ButtonType) bool {
 }
 
 func setStatus(orderStatus om.OrderStatus, floor int, button driver.ButtonType) {
-	if orderStatus == om.OS_Completed {
-		om.GetOrders(def.LocalID).UpdateOrder(floor, button)
-	} else if orderStatus == om.OS_Empty {
-		om.GetOrders(def.LocalID).RemoveOrder(floor, button)
+	if orderStatus == om.OS_Empty {
+		om.GetOrders(def.LocalId).RemoveOrder(floor, button)
 	} else {
-		om.GetOrders(def.LocalID).SetStatus(floor, button, orderStatus)
+		om.GetOrders(def.LocalId).SetStatus(floor, button, orderStatus)
 		fsm.SetAllLights()
 	}
 }
@@ -168,9 +166,9 @@ func getOwner(ids []int, floor int, button driver.ButtonType) int {
 }
 
 func setOwner(floor int, button driver.ButtonType, owner int) {
-	om.GetOrders(def.LocalID).SetOwner(floor, button, owner)
+	om.GetOrders(def.LocalId).SetOwner(floor, button, owner)
 	fsm.SetAllLights()
-	if owner == def.LocalID {
+	if owner == def.LocalId {
 		fsm.OnNewOrder(floor, button)
 	}
 }
@@ -178,7 +176,7 @@ func setOwner(floor int, button driver.ButtonType, owner int) {
 func addOrderWithOwner(floor int, button driver.ButtonType, owner int) {
 	scheduler.AddOrderWithOwner(fsm.Elevator, floor, button, owner)
 	fsm.SetAllLights()
-	if owner == def.LocalID {
+	if owner == def.LocalId {
 		fsm.OnNewOrder(floor, button)
 	}
 }
@@ -188,7 +186,7 @@ func addOrder(floor int, button driver.ButtonType) {
 }
 
 func takeOrder(floor int, button driver.ButtonType) {
-	om.GetOrders(def.LocalID).SetOwner(floor, button, def.LocalID)
+	om.GetOrders(def.LocalId).SetOwner(floor, button, def.LocalId)
 	fsm.SetAllLights()
 	fsm.OnNewOrder(floor, button)
 }

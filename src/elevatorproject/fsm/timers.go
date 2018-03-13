@@ -48,7 +48,7 @@ func onWatchdogTimeout() {
 
 	switch Elevator.Behaviour {
 	case def.Idle:
-		if ordermanager.GetOrders(def.LocalID).HasOrderOnFloor(Elevator.Floor) {
+		if ordermanager.GetOrders(def.LocalId).HasOrderOnFloor(Elevator.Floor) {
 			driver.SetDoorOpenLamp(true)
 			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
