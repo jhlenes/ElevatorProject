@@ -103,8 +103,7 @@ func checkForNewOrStuckElevators(msg ordersMsg) {
 		activeElevators[msg.ID] = true
 		fsm.NumActiveElevators = len(activeElevators)
 		def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
-	}
-	if _, ok := activeElevators[msg.ID]; msg.Stuck && ok { // elevator is stuck
+	} else if _, ok := activeElevators[msg.ID]; msg.Stuck && ok { // elevator is stuck
 		delete(activeElevators, msg.ID)
 		fsm.NumActiveElevators = len(activeElevators)
 		elevatorTimers[msg.ID].Stop()

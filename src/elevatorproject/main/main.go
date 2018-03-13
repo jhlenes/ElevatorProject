@@ -58,6 +58,7 @@ func printGoroutineStackTracesOnSigquit() {
 		<-sigs
 		stacklen := runtime.Stack(buf, true)
 		log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+		om.PrintOrder(*om.GetOrders(def.LocalId).(*om.OrderMatrix))
 	}
 }
 

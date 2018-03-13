@@ -76,6 +76,7 @@ func onWatchdogTimeout() {
 				}
 			}
 		}
+		// TODO: Maybe take orders from other elevators?
 	case def.DoorOpen:
 		// TODO: Figure out if this can happen and what to do
 		Elevator.Stuck = true
