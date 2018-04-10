@@ -106,11 +106,11 @@ func checkForNewOrStuckElevators(msg ordersMsg) {
 		fsm.NumActiveElevators = len(activeElevators)
 		def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 	} else if _, ok := activeElevators[msg.ID]; msg.Stuck && ok { // elevator is stuck
+		delete(activeElevators, msg.ID)
+		fsm.NumActiveElevators = len(activeElevators)
+		elevatorTimers[msg.ID].Stop()
+		def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
 		if msg.ID != def.LocalId {
-			delete(activeElevators, msg.ID)
-			fsm.NumActiveElevators = len(activeElevators)
-			elevatorTimers[msg.ID].Stop()
-			def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
 			synchronizer.ReassignOrders(getIds(activeElevators), msg.ID)
 		}
 	} else if !msg.Stuck && !ok { // elevator is no longer stuck

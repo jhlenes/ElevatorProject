@@ -8,6 +8,7 @@ import (
 	"elevatorproject/scheduler"
 )
 
+//StartOperatingAlone removes the finished orders waiting for acknowledgement, since it doesn't need it when alone
 func StartOperatingAlone() {
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
@@ -18,6 +19,7 @@ func StartOperatingAlone() {
 	}
 }
 
+//ReassignOrders reassigns orders of id to elevators in ids
 func ReassignOrders(ids []int, id int) {
 	if len(ids) == 0 {
 		return
@@ -26,6 +28,8 @@ func ReassignOrders(ids []int, id int) {
 
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
+
+			// Cab orders can only be executed by the original elevator
 			if b == driver.BT_Cab {
 				continue
 			}
@@ -35,13 +39,13 @@ func ReassignOrders(ids []int, id int) {
 				if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
 					addOrderWithOwner(f, b, bestId)
 				} else { // couldn't find a new owner
-					addOrder(f, b) // TODO: correct?
+					addOrder(f, b)
 				}
 			}
 
-			// TODO: Should also take order in some cases if communication was lost during confirmation
-			if om.GetOrders(def.LocalId).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty {
-				if om.GetOrders(def.LocalId).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 {
+			// If communication was lost during confirmation, we should take order in some cases to be safe 
+			if om.GetOrders(def.LocalId).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty { // we know about an order, they don't
+				if om.GetOrders(def.LocalId).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 { // owner has not been decided
 					if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
 						addOrderWithOwner(f, b, bestId)
 					} else {
@@ -54,6 +58,7 @@ func ReassignOrders(ids []int, id int) {
 	}
 }
 
+// Synchronize synchronizes the orders of this elevator with the orders of the elevators in <onlineIds>.
 func Synchronize(onlineIds, activeIds []int) {
 	if len(onlineIds) == 0 {
 		return
@@ -68,9 +73,9 @@ func Synchronize(onlineIds, activeIds []int) {
 			case om.OS_Empty:
 				if anyRemoving(onlineIds, f, b) {
 					// do nothing
-				} else if anyCompleted(onlineIds, f, b) {
+				} else if anyCompleted(onlineIds, f, b) { // an order has been completed
 					setStatus(om.OS_Completed, f, b)
-				} else if anyExisting(onlineIds, f, b) {
+				} else if anyExisting(onlineIds, f, b) { // there exists an order which we don't know about and want to add to our orders
 					if owner := getOwner(onlineIds, f, b); owner >= 0 {
 						addOrderWithOwner(f, b, owner)
 					} else {
@@ -78,11 +83,11 @@ func Synchronize(onlineIds, activeIds []int) {
 					}
 				}
 			case om.OS_Existing:
-				if anyRemoving(onlineIds, f, b) {
+				if anyRemoving(onlineIds, f, b) { // the order has been completed
 					setStatus(om.OS_Removing, f, b)
-				} else if anyCompleted(onlineIds, f, b) {
+				} else if anyCompleted(onlineIds, f, b) { // the order has been completed
 					setStatus(om.OS_Completed, f, b)
-				} else if anyExisting(onlineIds, f, b) && om.GetOrders(def.LocalId).GetOwner(f, b) < 0 {
+				} else if anyExisting(onlineIds, f, b) && om.GetOrders(def.LocalId).GetOwner(f, b) < 0 { // set owner if any or we should take it ourselves
 					if owner := getOwner(onlineIds, f, b); owner >= 0 {
 						setOwner(f, b, owner)
 					} else if shouldTakeOrder(f, b, onlineIds, activeIds) {
@@ -90,11 +95,11 @@ func Synchronize(onlineIds, activeIds []int) {
 					}
 				}
 			case om.OS_Completed:
-				if !anyExisting(onlineIds, f, b) && !anyEmpty(onlineIds, f, b) {
+				if !anyExisting(onlineIds, f, b) && !anyEmpty(onlineIds, f, b) { // if everyone agrees the order is completed, start removing
 					setStatus(om.OS_Removing, f, b)
 				}
 			case om.OS_Removing:
-				if !anyExisting(onlineIds, f, b) && !anyCompleted(onlineIds, f, b) {
+				if !anyExisting(onlineIds, f, b) && !anyCompleted(onlineIds, f, b) { // if everyone is ready to remove, remove
 					setStatus(om.OS_Empty, f, b)
 				}
 			}

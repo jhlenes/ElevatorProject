@@ -19,6 +19,7 @@ func Init() {
 	driver.Init(elevatorAddr, def.FloorCount)
 	om.ReadBackup()
 
+	// Initialize elevator states
 	Elevator.Floor = -1
 	Elevator.Dir = driver.MD_Up
 	driver.SetMotorDirection(driver.MD_Up)
@@ -63,11 +64,15 @@ func listenForDriverEvents() {
 	}
 }
 
+// OnNewOrder should be called when a new order has been assigned to this elevator. 
+// If idle or door open, this function starts the motor in the direction of the new order or opens the door if the order is on the same floor.
 func OnNewOrder(floor int, button driver.ButtonType) {
 	switch Elevator.Behaviour {
-	case def.DoorOpen: // if door is open, at correct floor and going in button direction => clear order
+	case def.DoorOpen: 
 		if Elevator.Floor == floor {
-			if button == driver.BT_HallUp && Elevator.Dir != driver.MD_Down {
+
+			// if door is open, at correct floor and going in button direction => clear order
+			if button == driver.BT_HallUp && Elevator.Dir != driver.MD_Down { 
 				resetDoorTimer()
 				scheduler.ClearOrders(floor, driver.MD_Up)
 			} else if button == driver.BT_HallDown && Elevator.Dir != driver.MD_Up {
@@ -94,6 +99,7 @@ func OnNewOrder(floor int, button driver.ButtonType) {
 
 }
 
+// onButtonPress adds the order to the ordermanager if enough active elevators, or completes the order right away if it is on the same floor
 func onButtonPress(buttonEvent driver.ButtonEvent) {
 	orderCompleted := false
 	switch Elevator.Behaviour {

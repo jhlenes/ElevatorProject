@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -33,8 +32,6 @@ func main() {
 	fsm.Init()
 	network.Init()
 
-	//go printOrderMatrices(2 * time.Second)
-	//go printNumGoroutines()
 	go printGoroutineStackTracesOnSigquit()
 	waitForShutdownSignal()
 }
@@ -60,19 +57,5 @@ func printGoroutineStackTracesOnSigquit() {
 		log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 		om.PrintOrder(*om.GetOrders(def.LocalId).(*om.OrderMatrix))
 		fmt.Printf("%+v\n", fsm.Elevator)
-	}
-}
-
-func printNumGoroutines() {
-	for {
-		fmt.Printf("#goroutines: %d\n", runtime.NumGoroutine())
-		time.Sleep(1 * time.Second)
-	}
-}
-
-func printOrderMatrices(interval time.Duration) {
-	for {
-		time.Sleep(interval)
-		om.PrintOrder(*om.GetOrders(def.LocalId).(*om.OrderMatrix))
 	}
 }
