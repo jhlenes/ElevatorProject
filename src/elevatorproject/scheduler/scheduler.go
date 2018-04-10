@@ -42,6 +42,7 @@ func AddOrderWithOwner(elevator def.Elevator, floor int, button driver.ButtonTyp
 	om.GetOrders(def.LocalId).SetOwner(floor, button, owner)
 }
 
+// timeToIdle calculates the cost of taking an order
 func timeToIdle(elev def.Elevator, orders om.Orders, floor int, button driver.ButtonType) int {
 	if elev.Stuck {
 		return -1
@@ -73,6 +74,7 @@ func timeToIdle(elev def.Elevator, orders om.Orders, floor int, button driver.Bu
 		elev.Dir = chooseDirection(elev.Floor, elev.Dir, ordersCopy)
 	}
 
+	// simulate the elevator
 	for {
 		if shouldStop(elev.Floor, elev.Dir, ordersCopy) {
 			clearOrders(elev.Floor, elev.Dir, ordersCopy)
@@ -119,20 +121,6 @@ func RemoveCosts() {
 	}
 }
 
-
-func StealOrder() {
-	orders := om.GetOrders(def.LocalId)
-	for floor := 0; floor < def.FloorCount; floor++ {
-		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
-			if orders.GetStatus(floor, button) == om.OS_Existing && button != driver.BT_Cab {
-				orders.SetOwner(floor, button, def.LocalId)
-				return
-			}
-		}
-	}
-}
-
-
 func shouldStop(floor int, dir driver.MotorDirection, orderMatrix om.Orders) bool {
 	switch dir {
 	case driver.MD_Down:
@@ -148,23 +136,24 @@ func shouldStop(floor int, dir driver.MotorDirection, orderMatrix om.Orders) boo
 }
 
 func clearOrders(floor int, dir driver.MotorDirection, orders om.Orders) {
-	updateOrder(floor, driver.BT_Cab, orders)
+	completeOrder(floor, driver.BT_Cab, orders)
 
 	switch dir {
 	case driver.MD_Down:
-		updateOrder(floor, driver.BT_HallDown, orders)
+		completeOrder(floor, driver.BT_HallDown, orders)
 		if !orders.HasOrderBelow(floor) {
-			updateOrder(floor, driver.BT_HallUp, orders)
+			completeOrder(floor, driver.BT_HallUp, orders)
 		}
 	case driver.MD_Up:
-		updateOrder(floor, driver.BT_HallUp, orders)
+		completeOrder(floor, driver.BT_HallUp, orders)
 		if !orders.HasOrderAbove(floor) {
-			updateOrder(floor, driver.BT_HallDown, orders)
+			completeOrder(floor, driver.BT_HallDown, orders)
 		}
 	}
 }
 
-func updateOrder(floor int, button driver.ButtonType, orders om.Orders) {
+// completeOrder removes cab orders and sets the status of hall orders to completed
+func completeOrder(floor int, button driver.ButtonType, orders om.Orders) {
 	if !orders.HasOrder(floor, button) {
 		return
 	}

@@ -10,6 +10,7 @@ import (
 	"elevatorproject/synchronizer"
 )
 
+// struct to be sent over the network
 type ordersMsg struct {
 	ID     int
 	Stuck  bool
@@ -47,7 +48,7 @@ func Init() {
 func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 	for {
 		select {
-		case msg := <-ordersRx:
+		case msg := <-ordersRx: // received orders from another elevator
 			if fsm.Elevator.Behaviour != def.Initializing {
 				checkForNewOrStuckElevators(msg)
 
@@ -57,7 +58,7 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 					synchronizer.Synchronize(getIds(onlineElevators), getIds(activeElevators))
 				}
 			}
-		case lostId := <-elevatorTimeoutCh:
+		case lostId := <-elevatorTimeoutCh: // an elevator timed out
 			if lostId != def.LocalId {
 				delete(onlineElevators, lostId)
 				delete(activeElevators, lostId)
@@ -65,6 +66,7 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 				def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 				elevatorTimers[lostId].Stop()
 
+				// if we're alone we have to delete finished orders without waiting for acknowledgement from other elevators
 				if len(onlineElevators) < 2 {
 					synchronizer.StartOperatingAlone()
 				}
@@ -80,12 +82,14 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 func sendMessages(ordersTx chan ordersMsg) {
 	for {
 		time.Sleep(def.SendTime * time.Millisecond)
-		if len(onlineElevators) < 2 { // TODO: maybe move this elesewhere?
+
+		// if we're alone we have to delete finished orders without waiting for acknowledgement from other elevators
+		if len(onlineElevators) < 2 {
 			synchronizer.StartOperatingAlone()
 		}
+
 		isStuck := fsm.Elevator.Stuck
 		ordersTx <- ordersMsg{def.LocalId, isStuck, *ordermanager.GetOrders(def.LocalId).(*ordermanager.OrderMatrix)}
-
 	}
 }
 

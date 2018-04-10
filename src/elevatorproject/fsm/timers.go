@@ -81,9 +81,7 @@ func onWatchdogTimeout() {
 			}
 		}
 
-		// TODO: Maybe take orders from other elevators?
-		//scheduler.StealOrder()
-		
+		// TODO: Maybe take orders from other elevators?		
 
 	case def.DoorOpen: // Trolling detected!
 		Elevator.Stuck = true
