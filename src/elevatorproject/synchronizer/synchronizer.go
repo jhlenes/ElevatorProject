@@ -21,9 +21,6 @@ func StartOperatingAlone() {
 
 //ReassignOrders reassigns orders of id to elevators in ids
 func ReassignOrders(ids []int, id int) {
-	if len(ids) == 0 {
-		return
-	}
 	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
 
 	for f := 0; f < def.FloorCount; f++ {
@@ -34,12 +31,20 @@ func ReassignOrders(ids []int, id int) {
 				continue
 			}
 
+			// If no active elevators, take everything ourselves
+			if len(ids) == 0 {
+				if om.GetOrders(def.LocalId).GetOwner(f, b) == id {
+					takeOrder(f, b)
+				}
+				continue
+			}
+
 			// Reassign orders owned by <id> to the elevator with the lowest cost
 			if om.GetOrders(def.LocalId).GetOwner(f, b) == id {
 				if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {
 					addOrderWithOwner(f, b, bestId)
 				} else { // couldn't find a new owner
-					addOrder(f, b)
+					takeOrder(f, b)
 				}
 			}
 
@@ -197,9 +202,7 @@ func addOrder(floor int, button driver.ButtonType) {
 }
 
 func takeOrder(floor int, button driver.ButtonType) {
-	om.GetOrders(def.LocalId).SetOwner(floor, button, def.LocalId)
-	fsm.SetAllLights()
-	fsm.OnNewOrder(floor, button)
+	addOrderWithOwner(floor, button, def.LocalId)
 }
 
 // getLowestCost gets the lowest cost of the available ids and the corresponding id, or -1 if no elevator has registered its cost

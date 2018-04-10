@@ -14,6 +14,8 @@ var watchdogTimerResetCh chan bool = make(chan bool, 10)
 
 func onDoorTimeout() {
 	resetWatchdogTimer()
+
+	// In case of trolling the elevator would have set its status to stuck
 	if (Elevator.Stuck) {
 		Elevator.Stuck = false
 		scheduler.AddCosts(Elevator)
@@ -46,6 +48,8 @@ func doorTimer(resetCh chan bool) {
 	}
 }
 
+// onwatchdogTimeout is called when the elevator has been inactive for a given time.
+// If the elevator is idle, this functions checks for orders. If it is moving or the door is open, the status is changed to stuck
 func onWatchdogTimeout() {
 	def.Info.Println("watchdog")
 	resetWatchdogTimer()
@@ -76,13 +80,15 @@ func onWatchdogTimeout() {
 				}
 			}
 		}
+
 		// TODO: Maybe take orders from other elevators?
-	case def.DoorOpen:
-		// TODO: Figure out if this can happen and what to do
+		//scheduler.StealOrder()
+		
+
+	case def.DoorOpen: // Trolling detected!
 		Elevator.Stuck = true
 		scheduler.RemoveCosts()
 	case def.Moving: // Elevator is stuck
-		// TODO: Figure out what to do here
 		Elevator.Stuck = true
 		scheduler.RemoveCosts()
 	}

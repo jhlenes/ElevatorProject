@@ -119,6 +119,20 @@ func RemoveCosts() {
 	}
 }
 
+
+func StealOrder() {
+	orders := om.GetOrders(def.LocalId)
+	for floor := 0; floor < def.FloorCount; floor++ {
+		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
+			if orders.GetStatus(floor, button) == om.OS_Existing && button != driver.BT_Cab {
+				orders.SetOwner(floor, button, def.LocalId)
+				return
+			}
+		}
+	}
+}
+
+
 func shouldStop(floor int, dir driver.MotorDirection, orderMatrix om.Orders) bool {
 	switch dir {
 	case driver.MD_Down:
