@@ -58,18 +58,20 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 				}
 			}
 		case lostId := <-elevatorTimeoutCh:
-			delete(onlineElevators, lostId)
-			delete(activeElevators, lostId)
-			fsm.NumActiveElevators = len(activeElevators)
-			def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
-			elevatorTimers[lostId].Stop()
+			if lostId != def.LocalId {
+				delete(onlineElevators, lostId)
+				delete(activeElevators, lostId)
+				fsm.NumActiveElevators = len(activeElevators)
+				def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
+				elevatorTimers[lostId].Stop()
 
-			if len(onlineElevators) < 2 {
-				synchronizer.StartOperatingAlone()
-			}
+				if len(onlineElevators) < 2 {
+					synchronizer.StartOperatingAlone()
+				}
 
-			if fsm.Elevator.Behaviour != def.Initializing {
-				synchronizer.ReassignOrders(getIds(activeElevators), lostId)
+				if fsm.Elevator.Behaviour != def.Initializing {
+					synchronizer.ReassignOrders(getIds(activeElevators), lostId)
+				}
 			}
 		}
 	}
