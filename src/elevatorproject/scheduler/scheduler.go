@@ -67,14 +67,14 @@ func timeToIdle(elev def.Elevator, orders om.Orders, floor int, button driver.Bu
 			return duration*10 + def.LocalId
 		}
 	case def.Moving:
-		duration += def.TRAVEL_TIME / 2
+		duration += def.TravelTime / 2
 		elev.Floor += int(elev.Dir)
 	case def.DoorOpen:
 		duration += def.DoorTimeout / 2
 		elev.Dir = chooseDirection(elev.Floor, elev.Dir, ordersCopy)
 	}
 
-	// simulate the elevator
+	// simulate a copy of the elevator
 	for {
 		if shouldStop(elev.Floor, elev.Dir, ordersCopy) {
 			clearOrders(elev.Floor, elev.Dir, ordersCopy)
@@ -97,7 +97,7 @@ func timeToIdle(elev def.Elevator, orders om.Orders, floor int, button driver.Bu
 		}
 
 		elev.Floor += int(elev.Dir)
-		duration += def.TRAVEL_TIME
+		duration += def.TravelTime
 	}
 }
 

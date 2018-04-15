@@ -46,7 +46,8 @@ func waitForShutdownSignal() {
 	os.Exit(1)
 }
 
-// printGoroutineStackTracesOnSigquit is called when you press ^\ (Control+Backslash) and can be used to debug goroutines
+// printGoroutineStackTracesOnSigquit is called when you press ^\ (Control+Backslash) and prints the goroutine stacktraces,
+// the order matrix and the elevator states
 func printGoroutineStackTracesOnSigquit() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGQUIT)

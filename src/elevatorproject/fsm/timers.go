@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Channels used to reset timers
 var doorTimerResetCh chan bool = make(chan bool, 10)
 var watchdogTimerResetCh chan bool = make(chan bool, 10)
 

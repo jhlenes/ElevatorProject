@@ -26,7 +26,7 @@ func Init() {
 	// Create timers for each elevator and have them send the elevator id to a shared channel on timeout
 	elevatorTimeoutCh := make(chan int, 10)
 	for i := range elevatorTimers {
-		elevatorTimers[i] = time.NewTimer(def.ElevatorTimeout * time.Second)
+		elevatorTimers[i] = time.NewTimer(def.NetworkTimeout * time.Second)
 		elevatorTimers[i].Stop()
 		go func(timer *time.Timer, id int) {
 			for range timer.C {
@@ -52,7 +52,7 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 			if fsm.Elevator.Behaviour != def.Initializing {
 				checkForNewOrStuckElevators(msg)
 
-				elevatorTimers[msg.ID].Reset(def.ElevatorTimeout * time.Second)
+				elevatorTimers[msg.ID].Reset(def.NetworkTimeout * time.Second)
 				if msg.ID != def.LocalId {
 					ordermanager.AddMatrix(msg.ID, msg.Orders)
 					synchronizer.Synchronize(getIds(onlineElevators), getIds(activeElevators))

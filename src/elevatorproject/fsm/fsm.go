@@ -8,7 +8,9 @@ import (
 	"fmt"
 )
 
+// We can ignore button presses if there are not enough active elevators
 var NumActiveElevators = 1
+
 var Elevator def.Elevator
 var buttonStatus [def.FloorCount][def.ButtonCount]bool
 
@@ -26,7 +28,7 @@ func Init() {
 	Elevator.Behaviour = def.Initializing
 	Elevator.ID = def.LocalId
 
-	// Reset all lights
+	// Set all lights to their correct state
 	for floor := 0; floor < def.FloorCount; floor++ {
 		for button := driver.ButtonType(0); button < def.ButtonCount; button++ {
 			driver.SetButtonLamp(button, floor, false)
@@ -134,6 +136,7 @@ func onButtonPress(buttonEvent driver.ButtonEvent) {
 		scheduler.AddOrder(Elevator, buttonEvent.Floor, buttonEvent.Button)
 	}
 
+	// cab orders are accepted immedeately, so we need to set the lights accordingly
 	if buttonEvent.Button == driver.BT_Cab {
 		SetAllLights()
 	}
@@ -180,6 +183,7 @@ func SetAllLights() {
 	}
 }
 
+// SetLight tells the driver to change the button lamp if necessary
 func SetLight(floor int, button driver.ButtonType) {
 	if button == driver.BT_Cab {
 		if bStatus := om.GetOrders(def.LocalId).HasOrder(floor, button); bStatus != buttonStatus[floor][button] {
