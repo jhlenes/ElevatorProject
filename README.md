@@ -1,5 +1,34 @@
 # Elevator project
 
+## Modules
+
+This program consists of several modules:
+
+### definitions
+The definitions module contains program wide constants and types.
+
+### driver
+The driver module, found [here](https://github.com/TTK4145/driver-go), communicates with the hardware.
+
+### fsm
+The fsm module is an implementation of a finite state machine for the elevator. It sends commands to the driver, gets information about the orders through the scheduler, and also reads from the ordermanager in order to update the button lamps.
+
+### main
+The main module is the starting point of the program. It initializes the fsm and network modules, and waits for the shutdown signal.
+
+### network
+The network module is based on [this code](https://github.com/TTK4145/Network-go). It handles the communication between the elevators and forwards the received information to the synchronizer module. It also updates the fsm module with the number of active elevators.
+
+### ordermanager
+The ordermanager module stores the information about the orders.
+
+### scheduler
+The scheduler module uses information from the ordermanager to make decisions about what the elevator should do.
+
+### synchronizer
+The synchronizer module synchronizes the information received over the network with your own information stored in the ordermanager. It also handles reassignment of orders when elevators fail.
+
+
 ## Running on the actual hardware
 
 Start the [elevator server](https://github.com/TTK4145/elevator-server)
