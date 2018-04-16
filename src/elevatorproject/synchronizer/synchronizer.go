@@ -21,8 +21,6 @@ func StartOperatingAlone() {
 
 //ReassignOrders reassigns orders of id to elevators in ids
 func ReassignOrders(ids []int, id int) {
-	def.Info.Printf("Reassigning orders of %v to elevators: %v\n", id, ids)
-
 	for f := 0; f < def.FloorCount; f++ {
 		for b := driver.ButtonType(0); b < def.ButtonCount; b++ {
 
@@ -48,7 +46,7 @@ func ReassignOrders(ids []int, id int) {
 				}
 			}
 
-			// If communication was lost during confirmation, we should take order in some cases to be safe 
+			// If communication was lost during confirmation, we should take order in some cases to be safe
 			if om.GetOrders(def.LocalId).GetStatus(f, b) == om.OS_Existing && om.GetOrders(id).GetStatus(f, b) == om.OS_Empty { // we know about an order, they don't
 				if om.GetOrders(def.LocalId).GetOwner(f, b) < 0 && om.GetOrders(id).GetOwner(f, b) < 0 { // owner has not been decided
 					if cost, bestId := getLowestCost(ids, f, b); cost >= 0 {

@@ -63,7 +63,6 @@ func listenAtChannels(ordersRx chan ordersMsg, elevatorTimeoutCh chan int) {
 				delete(onlineElevators, lostId)
 				delete(activeElevators, lostId)
 				fsm.NumActiveElevators = len(activeElevators)
-				def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 				elevatorTimers[lostId].Stop()
 
 				// if we're alone we have to delete finished orders without waiting for acknowledgement from other elevators
@@ -108,18 +107,15 @@ func checkForNewOrStuckElevators(msg ordersMsg) {
 		onlineElevators[msg.ID] = true
 		activeElevators[msg.ID] = true
 		fsm.NumActiveElevators = len(activeElevators)
-		def.Info.Printf("Peers: %v\n", getIds(onlineElevators))
 	} else if _, ok := activeElevators[msg.ID]; msg.Stuck && ok { // elevator is stuck
 		delete(activeElevators, msg.ID)
 		fsm.NumActiveElevators = len(activeElevators)
 		elevatorTimers[msg.ID].Stop()
-		def.Info.Printf("Elevator is stuck: %v\n", msg.ID)
 		if msg.ID != def.LocalId {
 			synchronizer.ReassignOrders(getIds(activeElevators), msg.ID)
 		}
 	} else if !msg.Stuck && !ok { // elevator is no longer stuck
 		activeElevators[msg.ID] = true
 		fsm.NumActiveElevators = len(activeElevators)
-		def.Info.Printf("Elevator no longer stuck: %v\n", msg.ID)
 	}
 }

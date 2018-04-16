@@ -55,26 +55,24 @@ func listenForDriverEvents() {
 		select {
 		case button := <-drvButtons:
 			if Elevator.Behaviour != def.Initializing {
-				def.Info.Printf("%+v\n", button)
 				go onButtonPress(button)
 			}
 
 		case floor := <-drvFloors:
-			def.Info.Printf("%+v\n", floor)
 			go onFloorArrival(floor)
 		}
 	}
 }
 
-// OnNewOrder should be called when a new order has been assigned to this elevator. 
+// OnNewOrder should be called when a new order has been assigned to this elevator.
 // If idle or door open, this function starts the motor in the direction of the new order or opens the door if the order is on the same floor.
 func OnNewOrder(floor int, button driver.ButtonType) {
 	switch Elevator.Behaviour {
-	case def.DoorOpen: 
+	case def.DoorOpen:
 		if Elevator.Floor == floor {
 
 			// if door is open, at correct floor and going in button direction => clear order
-			if button == driver.BT_HallUp && Elevator.Dir != driver.MD_Down { 
+			if button == driver.BT_HallUp && Elevator.Dir != driver.MD_Down {
 				resetDoorTimer()
 				scheduler.ClearOrders(floor, driver.MD_Up)
 			} else if button == driver.BT_HallDown && Elevator.Dir != driver.MD_Up {
