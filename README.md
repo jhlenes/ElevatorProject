@@ -1,7 +1,10 @@
 # Elevator project
 
-## Modules
+This program implements a distributed fault tolerant elevator system in Go. The program has been developed for three elevators and four floors. However, it also works for an arbitrary amount of elevators and floors.
 
+The key part of this project was making the system robust for all kinds of failures, i.e. an order should never be lost. E.g. If one elevator fails, another elevator should take its orders. The main idea behind this implementation is that the elevators constantly broadcasts their worldview, i.e. the placed orders, over UDP. All online elevators then have access to all the worldviews and can reach consensus without the need for acknowledgements.
+
+## Modules
 This program consists of several modules:
 
 ### definitions
