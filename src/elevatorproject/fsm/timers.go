@@ -58,8 +58,12 @@ func onWatchdogTimeout() {
 			driver.SetDoorOpenLamp(true)
 			Elevator.Behaviour = def.DoorOpen
 			resetDoorTimer()
-			scheduler.ClearOrders(Elevator.Floor, driver.MD_Up)
-			scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
+
+			if ordermanager.GetOrders(def.LocalId).HasOrder(Elevator.Floor, driver.BT_HallUp) {
+				scheduler.ClearOrders(Elevator.Floor, driver.MD_Up)
+			} else if ordermanager.GetOrders(def.LocalId).HasOrder(Elevator.Floor, driver.BT_HallDown) {
+				scheduler.ClearOrders(Elevator.Floor, driver.MD_Down)
+			}
 			SetAllLights()
 		} else {
 			Elevator.Dir = scheduler.ChooseDirection(Elevator.Floor, Elevator.Dir)

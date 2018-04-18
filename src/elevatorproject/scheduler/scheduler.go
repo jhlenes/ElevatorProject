@@ -140,13 +140,15 @@ func clearOrders(floor int, dir driver.MotorDirection, orders om.Orders) {
 
 	switch dir {
 	case driver.MD_Down:
-		completeOrder(floor, driver.BT_HallDown, orders)
-		if !orders.HasOrderBelow(floor) {
+		if orders.HasOrder(floor, driver.BT_HallDown) {
+			completeOrder(floor, driver.BT_HallDown, orders)
+		} else if !orders.HasOrderBelow(floor) {
 			completeOrder(floor, driver.BT_HallUp, orders)
 		}
 	case driver.MD_Up:
-		completeOrder(floor, driver.BT_HallUp, orders)
-		if !orders.HasOrderAbove(floor) {
+		if orders.HasOrder(floor, driver.BT_HallUp) {
+			completeOrder(floor, driver.BT_HallUp, orders)
+		} else if !orders.HasOrderAbove(floor) {
 			completeOrder(floor, driver.BT_HallDown, orders)
 		}
 	}
