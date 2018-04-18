@@ -4,6 +4,8 @@ This program implements a distributed fault tolerant elevator system in Go. The 
 
 The key part of this project was making the system robust for all kinds of failures, i.e. an order should never be lost. E.g. If one elevator fails, another elevator should take its orders. The main idea behind this implementation is that the elevators constantly broadcasts their worldview, i.e. the placed orders, over UDP. All online elevators then have access to all the worldviews and can reach consensus without the need for acknowledgements.
 
+This program received full score on the FAT test except for item 2.7 in the [specification](project-description/SPECIFICATION.md) which was misinterpreted. When only two orders existed in the system, one hall-up and one hall-down on the same floor, the elevator would clear both at the same time instead of waiting for some time to allow new cab orders to be placed. A quick fix for this was applied in the latest commit, but has not yet been tested extensively.
+
 ## Modules
 This program consists of several modules:
 
